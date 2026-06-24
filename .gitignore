@@ -18,13 +18,6 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# JSON files
-*.json
-!package.json
-!tsconfig.json
-!vite.config.ts
-!nodemon.json
-
 # IDE/editor settings
 .vscode/
 .idea/
@@ -42,3 +35,9 @@ frontend/out/
 # Backend specific
 backend/coverage/
 backend/tmp/
+
+# Images folder
+Images/
+
+#Others folder
+Others/

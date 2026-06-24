@@ -1,0 +1,99 @@
+:root {
+    --fs-size: 1.2rem;
+    --color: white;
+    --color2: chocolate;
+    --background-color: chocolate;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+#intro {
+    background-image: url("../Images/Shapes.png");
+    background-size: cover;
+    background-position: center;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+#welcome {
+    transform: translateY(-20%);
+    visibility: hidden;
+}
+
+#welcome h1 {
+    font-size: 6rem;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    color: brown;
+}
+
+#welcome p {
+    font-size: var(--fs-size);
+    color: var(--color2);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#buttons {
+    display: flex;
+    visibility: hidden;
+}
+
+#buttons button {
+    border: 1px solid brown;
+    margin: 10px;
+    padding: 5px 10px;
+    background: transparent;
+    border-radius: 5px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.5s ease;
+}
+
+#buttons button::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--background-color);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+    z-index: -1;
+}
+
+#buttons button:hover,
+#buttons button:focus {
+    cursor: pointer;
+    transform: scale(1.3);
+    color: var(--color);
+}
+
+#buttons button:hover::before,
+#buttons button:focus::before {
+    transform: translateX(0);
+}
+
+#intro footer{
+    background-color: var(--background-color);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    text-align: center;
+    color: var(--color);
+}
+#auth{
+    border: 2px solid var(--color2);
+    height: 60vh;
+    width: 30%;
+    padding: 1.2rem;
+    transform: translateY(-10vh);
+}
+#auth label{
+    padding: 1;
+}
