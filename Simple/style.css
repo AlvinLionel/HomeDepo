@@ -2,7 +2,7 @@
     --fs-size: 1.2rem;
     --color: white;
     --color2: chocolate;
-    --background-color: chocolate;
+    --chocolate: chocolate;
 }
 
 * {
@@ -10,7 +10,7 @@
     padding: 0;
 }
 
-#intro {
+body {
     background-image: url("../Images/Shapes.png");
     background-size: cover;
     background-position: center;
@@ -21,9 +21,15 @@
     flex-direction: column;
 }
 
+/*Index page*/
+#intro {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+}
+
 #welcome {
     transform: translateY(-20%);
-    visibility: hidden;
 }
 
 #welcome h1 {
@@ -40,7 +46,6 @@
 
 #buttons {
     display: flex;
-    visibility: hidden;
 }
 
 #buttons button {
@@ -61,7 +66,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--background-color);
+    background: var(--chocolate);
     transform: translateX(-100%);
     transition: transform 0.5s ease;
     z-index: -1;
@@ -79,21 +84,140 @@
     transform: translateX(0);
 }
 
-#intro footer{
-    background-color: var(--background-color);
+#guest_link {
+    display: block;
+    color: chocolate;
+    text-decoration: none;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+#guest_link:hover {
+    text-decoration: underline;
+    color: darkorange;
+}
+
+/* Auth page */
+#auth {
+    border: 2px solid var(--color2);
+    margin-top: 20px;
+    padding: 25px;
+    background: white;
+    color: #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px #00000026;
+    width: 300px;
+    text-align: left;
+}
+
+#auth h2 {
+    margin-bottom: 15px;
+    text-align: center;
+    color: var(--chocolate);
+}
+
+#auth label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+
+#auth input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#auth button {
+    width: 100%;
+    padding: 10px;
+    background-color: chocolate;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#auth button:hover {
+    background-color: darkorange;
+}
+
+    /* Home page */
+.home_body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9;
+    color: #333;
+}
+
+.home_header {
+    background-color: chocolate;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+/* Services grid */
+#services {
+    padding: 2rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card h2 {
+    margin-bottom: 0.5rem;
+    color: chocolate;
+}
+
+.card p {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    color: #555;
+}
+
+.card a {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: chocolate;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.card a:hover {
+    background-color: #a0522d;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Footer */
+footer {
+    background-color: var(--chocolate);
     position: fixed;
     bottom: 0;
     width: 100%;
     text-align: center;
     color: var(--color);
-}
-#auth{
-    border: 2px solid var(--color2);
-    height: 60vh;
-    width: 30%;
-    padding: 1.2rem;
-    transform: translateY(-10vh);
-}
-#auth label{
-    padding: 1;
 }
