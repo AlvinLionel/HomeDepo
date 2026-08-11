@@ -1,0 +1,75 @@
+<div id="auth">
+    <h2>Login / Sign Up</h2>
+    <form action="#" method="post">
+        <label for="email">Email</label><br>
+        <input type="email" name="email" id="email" required><br>
+
+        <label for="password">Password</label><br>
+        <input type="password" name="password" id="password" required><br>
+
+        <input type="submit" value="Submit">
+    </form>
+</div>
+<style>
+    #auth {
+        display: none;
+        /* hidden until triggered */
+        margin-top: 20px;
+        padding: 25px;
+        background: #fff;
+        color: #333;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px #00000026;
+        width: 300px;
+        text-align: left;
+    }
+
+    #auth h2 {
+        margin-bottom: 15px;
+        text-align: center;
+        color: chocolate;
+    }
+
+    #auth label {
+        font-weight: bold;
+        margin-top: 10px;
+        display: block;
+    }
+
+    #auth input[type="email"],
+    #auth input[type="password"] {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    #auth input[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        background-color: chocolate;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    #auth input[type="submit"]:hover {
+        background-color: darkorange;
+    }
+</style>
+
+<script>
+    loginBtn.addEventListener("click", () => {
+        authForm.style.display = "block";
+        authForm.querySelector("h2").textContent = "Login";
+    });
+
+    signupBtn.addEventListener("click", () => {
+        authForm.style.display = "block";
+        authForm.querySelector("h2").textContent = "Sign Up";
+    });
+
+</script>
