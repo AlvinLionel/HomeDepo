@@ -1,0 +1,146 @@
+/* Navbar */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #fffffff0;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid #774d2a1f;
+}
+
+.navbar-content {
+    width: min(1400px, 100%);
+    min-height: 72px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.navbar-logo {
+    color: #5d2c13;
+    font-size: 1.35rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.navbar-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.navbar-links a,
+.cart-link {
+    color: var(--muted);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 180ms ease;
+}
+
+.navbar-links a:hover,
+.navbar-links a.active {
+    color: #c96d2d;
+}
+
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.cart-link {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    position: relative;
+}
+
+.cart-count {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 0.3rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #c96d2d;
+    color: white;
+    font-size: 0.7rem;
+}
+
+.profile-button,
+.menu-toggle {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.profile-button {
+    font-size: 1.2rem;
+}
+
+.menu-toggle {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .navbar-content {
+        min-height: 64px;
+        padding: 0 1rem;
+        gap: 1rem;
+    }
+
+    .menu-toggle {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0.45rem;
+    }
+
+    .menu-toggle span {
+        width: 22px;
+        height: 2px;
+        background: #3f2618;
+        border-radius: 99px;
+    }
+
+    .navbar-links {
+        display: none;
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        background: white;
+        border-bottom: 1px solid rgba(119, 77, 42, 0.12);
+        box-shadow: 0 12px 24px rgba(97, 52, 18, 0.1);
+    }
+
+    .navbar-links.open {
+        display: flex;
+    }
+
+    .navbar-actions {
+        margin-left: auto;
+    }
+
+    .cart-link span:nth-child(2),
+    .profile-button {
+        display: none;
+    }
+}
+
+/* Footer */
+footer {
+    background-color: var(--chocolate);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    color: var(--color);
+}

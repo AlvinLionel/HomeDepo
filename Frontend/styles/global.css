@@ -1,0 +1,41 @@
+:root {
+    --fs-size: 1.2rem;
+    --color: white;
+    --color2: chocolate;
+    --chocolate: chocolate;
+    --text: #2d1f18;
+    --muted: #5c4337;
+    --card-shadow: 0 18px 32px rgba(83, 49, 24, 0.08);
+    --bg-soft: #f8f2ed;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-image: url("../assets/Shapes.png");
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+body.home-page {
+    display: block;
+    justify-content: initial;
+    align-items: initial;
+    flex-direction: initial;
+}
+
+body.home-page #root {
+    width: 100%;
+}
+
+body.home-page .home {
+    width: 100%;
+}

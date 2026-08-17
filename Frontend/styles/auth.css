@@ -1,0 +1,46 @@
+#auth {
+    border: 2px solid var(--color2);
+    margin-top: 20px;
+    padding: 25px;
+    background: white;
+    color: #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px #00000026;
+    width: 300px;
+    text-align: left;
+}
+
+#auth h2 {
+    margin-bottom: 15px;
+    text-align: center;
+    color: var(--chocolate);
+}
+
+#auth label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+
+#auth input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#auth button {
+    width: 100%;
+    padding: 10px;
+    background-color: chocolate;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#auth button:hover {
+    background-color: darkorange;
+}
