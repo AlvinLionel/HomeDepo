@@ -1,8 +1,9 @@
 import React from "react";
 import Footer from "../components/footer";
 import { useNavigate } from "react-router-dom";
+import "../styles/welcome.css";
 
-function App() {
+function Welcome() {
     const navigate = useNavigate();
 
     return (
@@ -21,4 +22,4 @@ function App() {
     )
 }
 
-export default App;
+export default Welcome;

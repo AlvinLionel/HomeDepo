@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Footer from "../components/footer";
+import "../styles/auth.css";
 
 function Auth() {
     const navigate = useNavigate();
@@ -20,7 +21,7 @@ function Auth() {
         };
 
         try {
-            const response = await fetch("http://localhost:5000/api/auth/login", {
+            const response = await fetch("/api/auth/login", {//const response = await fetch("http://localhost:5000/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -32,7 +33,8 @@ function Auth() {
             }
 
             setSuccess("Login successful");
-            navigate("/Home", { state: { username: data.user.username } });
+            localStorage.setItem("homexUsername", data.user.username);
+            navigate("/Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Login failed");
         }
@@ -59,7 +61,7 @@ function Auth() {
         };
 
         try {
-            const response = await fetch("http://localhost:5000/api/auth/signup", {
+            const response = await fetch("/api/auth/signup", { //const response = await fetch("http://localhost:5000/api/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -71,7 +73,8 @@ function Auth() {
             }
 
             setSuccess("Account created successfully");
-            navigate("/Home", { state: { username: data.user.username } });
+            localStorage.setItem("homeDepoUsername", data.user.username);
+            navigate("/Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Signup failed");
         }
@@ -118,7 +121,7 @@ function Auth() {
                     </p>
                 </div>
             )}
-            <Footer/>
+            <Footer />
         </div>
     );
 }

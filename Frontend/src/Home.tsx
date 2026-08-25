@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import Footer from "../components/footer";
+import Navbar from "../components/navbar";
+import "../styles/home.css";
 
 function Home() {
-  const location = useLocation();
-  const rawUsername = (location.state as { username?: string } | null)?.username?.trim();
+  const rawUsername = localStorage.getItem("homexUsername")?.trim();
   const displayName = rawUsername && rawUsername.toLowerCase() !== "there" ? rawUsername : "friend";
   const [showWelcome, setShowWelcome] = useState(true);
 
@@ -23,6 +23,7 @@ function Home() {
 
   return (
     <div className="home">
+      <Navbar /* cartItemCount={0} */ />   {/* Comment out the item count after implimentation */}
       <div className={`welcome-hero ${showWelcome ? "intro" : "settled"}`}>
         <span className="welcome-label">At a glance</span>
         <h1>{showWelcome ? `Welcome home, ${displayName}` : `Welcome back, ${displayName}`}</h1>
