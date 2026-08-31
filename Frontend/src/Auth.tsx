@@ -1,15 +1,23 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../components/footer";
 import "../styles/auth.css";
 
 function Auth() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [mode, setMode] = useState<"login" | "signup">("login");
     const [error, setError] = useState<string>("");
     const [success, setSuccess] = useState<string>("");
 
-    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    useEffect(() => {
+        const paramMode = searchParams.get("mode");
+        if (paramMode === "signup" || paramMode === "login") {
+            setMode(paramMode);
+        }
+    }, [searchParams])
+
+    const handleLogin: React.FormEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
         setError("");
         setSuccess("");
@@ -21,7 +29,7 @@ function Auth() {
         };
 
         try {
-            const response = await fetch("/api/auth/login", {//const response = await fetch("http://localhost:5000/api/auth/login", {
+            const response = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -40,7 +48,7 @@ function Auth() {
         }
     };
 
-    const handleSignup = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSignup: React.FormEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
         setError("");
         setSuccess("");
@@ -61,7 +69,7 @@ function Auth() {
         };
 
         try {
-            const response = await fetch("/api/auth/signup", { //const response = await fetch("http://localhost:5000/api/auth/signup", {
+            const response = await fetch("/api/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -73,7 +81,7 @@ function Auth() {
             }
 
             setSuccess("Account created successfully");
-            localStorage.setItem("homeDepoUsername", data.user.username);
+            localStorage.setItem("homeXUsername", data.user.username);
             navigate("/Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Signup failed");
@@ -82,7 +90,7 @@ function Auth() {
 
     return (
         <div id="auth">
-            {mode === "login" ? (
+            {mode === "login" && (
                 <div id="loginForm">
                     <h2>Login</h2>
                     <form id="loginFormElement" onSubmit={handleLogin}>
@@ -91,15 +99,21 @@ function Auth() {
                         <label htmlFor="loginPassword">Password</label><br />
                         <input type="password" id="loginPassword" name="password" required /><br />
                         <button type="submit">Login</button>
+                        <a href="#" className="forgotPassword"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                navigate("/reset-password");
+                            }}
+                        >Forgot password</a>
                     </form><br />
                     {error && <p style={{ color: "crimson" }}>{error}</p>}
                     {success && <p style={{ color: "green" }}>{success}</p>}
                     <p>
                         Don’t have an account?{" "}
-                        <a href="#" onClick={() => setMode("signup")}>Sign Up</a>
+                        <a href="#" onClick={() => navigate("/Auth?mode=signup")}>Sign Up</a><br />
                     </p>
-                </div>
-            ) : (
+                </div>)}
+            {mode == "signup" && (
                 <div id="signupForm">
                     <h2>Sign Up</h2>
                     <form id="signupFormElement" onSubmit={handleSignup}>
@@ -117,7 +131,7 @@ function Auth() {
                     {success && <p style={{ color: "green" }}>{success}</p>}
                     <p>
                         Already have an account?{" "}
-                        <a href="#" onClick={() => setMode("login")}>Login</a>
+                        <a href="#" onClick={() => navigate("/Auth?mode=login")}>Login</a>
                     </p>
                 </div>
             )}

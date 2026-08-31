@@ -10,6 +10,7 @@ import Products from "./Products";
 import Discover from "./Discover";
 import Cart from "./Cart";
 import Welcome from "./Welcome";
+import ResetPassword from "../pages/ResetPassword";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/products" element={<Products/>} />
             <Route path="/discover" element={<Discover/>} />
             <Route path="/cart" element={<Cart/>} />
+            <Route path="/reset-password" element={<ResetPassword/>}/>
         </Routes>
     </BrowserRouter>
 )

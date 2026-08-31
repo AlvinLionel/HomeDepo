@@ -44,3 +44,12 @@
 #auth button:hover {
     background-color: darkorange;
 }
+a:hover,
+a:focus{
+    color: #6f6fe7;
+}
+.forgotPassword{
+    display: block;
+    text-align: center;
+    outline: none;
+}

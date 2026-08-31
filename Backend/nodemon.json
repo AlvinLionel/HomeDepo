@@ -1,9 +1,13 @@
 {
   "watch": [
     "server.js",
-    ".env"
+    ".env",
+    "routes",
+    "controllers",
+    "mailer",
+    "utils"
   ],
-  "ext": "js,json",
+  "ext": "js,json,env",
   "ignore": [
     "node_modules"
   ],

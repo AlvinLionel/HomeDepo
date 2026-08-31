@@ -5,6 +5,8 @@ const path = require("path");
 const crypto = require("crypto");
 const mysql = require("mysql2/promise");
 
+const { sendResetEmail } = require("./mailHandler");
+
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
@@ -71,8 +73,7 @@ function waitForNominatimSlot() {
 
 function buildViewbox(latitude, longitude, radiusKm = 10) {
   const latitudeDelta = radiusKm / 111;
-  const longitudeDelta =
-    radiusKm / (111 * Math.cos((latitude * Math.PI) / 180));
+  const longitudeDelta = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180));
 
   const west = longitude - longitudeDelta;
   const north = latitude + latitudeDelta;
@@ -98,11 +99,7 @@ app.get("/api/stores/search", async (req, res) => {
     });
   }
 
-  if (!NOMINATIM_USER_AGENT) {
-    return res.status(500).json({
-      message: "Nominatim user agent is not configured on the server.",
-    });
-  }
+  if (!NOMINATIM_USER_AGENT) return res.status(500).json({ message: "Nominatim user agent is not configured on the server." });
 
   const hasValidLocation =
     Number.isFinite(latitude) &&
@@ -149,9 +146,7 @@ app.get("/api/stores/search", async (req, res) => {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`Nominatim returned status ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Nominatim returned status ${response.status}`);
 
     const places = await response.json();
 
@@ -166,14 +161,8 @@ app.get("/api/stores/search", async (req, res) => {
       longitude: Number(place.lon),
       category: place.category,
       type: place.type,
-      website:
-        place.extratags?.website ||
-        place.extratags?.["contact:website"] ||
-        null,
-      phone:
-        place.extratags?.phone ||
-        place.extratags?.["contact:phone"] ||
-        null,
+      website: place.extratags?.website || place.extratags?.["contact:website"] || null,
+      phone: place.extratags?.phone || place.extratags?.["contact:phone"] || null,
       openingHours: place.extratags?.opening_hours || null,
     }));
 
@@ -189,23 +178,16 @@ app.get("/api/stores/search", async (req, res) => {
     });
   } catch (error) {
     console.error("Store search error:", error.message);
-
-    res.status(502).json({
-      message: "Unable to search for nearby stores right now.",
-    });
+    res.status(502).json({ message: "Unable to search for nearby stores right now." });
   }
 });
 
 app.post("/api/auth/signup", async (req, res) => {
-  if (!dbReady) {
-    return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-  }
+  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { username, email, password } = req.body || {};
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ message: "Username, email, and password are required." });
-  }
+  if (!username || !email || !password) return res.status(400).json({ message: "Username, email, and password are required." });
 
   try {
     const [existingUsers] = await pool.query(
@@ -213,9 +195,7 @@ app.post("/api/auth/signup", async (req, res) => {
       [email, username]
     );
 
-    if (existingUsers.length > 0) {
-      return res.status(409).json({ message: "A user with that email or username already exists." });
-    }
+    if (existingUsers.length > 0) return res.status(409).json({ message: "A user with that email or username already exists." });
 
     const passwordHash = hashPassword(password);
     const [result] = await pool.query(
@@ -238,15 +218,11 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  if (!dbReady) {
-    return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-  }
+  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { email, password } = req.body || {};
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required." });
-  }
+  if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
 
   try {
     const passwordHash = hashPassword(password);
@@ -255,9 +231,7 @@ app.post("/api/auth/login", async (req, res) => {
       [email, passwordHash]
     );
 
-    if (rows.length === 0) {
-      return res.status(401).json({ message: "Invalid email or password." });
-    }
+    if (rows.length === 0) return res.status(401).json({ message: "Invalid email or password." });
 
     const user = rows[0];
     const device = (req.get("user-agent") || "Unknown device").slice(0, 255);
@@ -280,6 +254,72 @@ app.post("/api/auth/login", async (req, res) => {
     res.status(500).json({ message: "Unable to complete login.", error: error.message });
   }
 });
+
+app.post("/api/auth/check-email", async (req, res) => {
+  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
+
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  try {
+    const [rows] = await pool.query(
+      "SELECT id from users WHERE email = ? LIMIT 1",
+      [email]
+    );
+    if (rows.length === 0) res.status(404).json({ message: "Email not found" });
+
+    res.json({ message: "Email exists", userId: rows[0].id });
+  } catch (error) {
+    console.error("Check email error:", error);
+    res.status(500).json({ message: "Unable to check email.", error: error.message });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
+
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword) return res.status(400).json({ message: "Token and password are required." });
+
+  try {
+    const [rows] = await pool.query("SELECT user_id, expires_at FROM reset_tokens WHERE token = ? LIMIT 1", [token]);
+    if (rows.length === 0) return res.status(404).json({ message: "Invalid token." });
+
+    if (new Date(rows[0].expires_at) < new Date()) return res.status(400).json({ message: "Token expired." });
+
+    const passwordHash = hashPassword(newPassword);
+    await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, rows[0].user_id]);
+    await pool.query("DELETE FROM reset_tokens WHERE token = ?", [token]);
+
+    res.json({ message: "Password reset successful." });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Unable to reset password.", error: error.message });
+  }
+});
+
+app.post("/api/auth/request-reset", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Email is required." });
+
+  try {
+    const [rows] = await pool.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
+    if (rows.length === 0) return res.status(404).json({ message: "Email not found" });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const device = (req.get("user-agent") || "Unknown device").slice(0, 255);
+
+    await pool.query("INSERT INTO reset_tokens(user_id,token,expires_at, device) VALUES (?,?,?,?)", [rows[0].id, token, expiresAt, device]);
+
+    await sendResetEmail(email, token);
+
+    res.json({ message: "Password reset email sent." });
+  } catch (err) {
+    console.error("Request reset error:", err);
+    res.status(500).json({ message: "Unable to send reset email.", error: err.message });
+  }
+})
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT} as at ${new Date().toLocaleTimeString()}`);
