@@ -4,8 +4,11 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true,
     port: 5173,
-    //allowedHosts: ["decimal-laxative-antibody.ngrok-free.dev"], comment out when remote showing
+    allowedHosts: [
+      ".ngrok-free.dev"
+    ],
     proxy: {
       "/api": {
         target: "http://localhost:5000",

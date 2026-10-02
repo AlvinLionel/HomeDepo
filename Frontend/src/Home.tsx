@@ -33,34 +33,32 @@ function Home() {
       <main className={`home-content ${showWelcome ? "loading" : "ready"}`}>
         <section className="home-summary">
           <h2>Home essentials, all in one place.</h2>
-          <p>
-            Find nearby services, browse what’s new, and keep the things you need within reach.
-          </p>
+          <p>Find nearby services, browse what’s new, and keep the things you need within reach.</p>
         </section>
 
         <section id="services">
-          <div className="service-card">
+          <div className="card">
             <div className="card-icon">🗺️</div>
             <h2>Map</h2>
             <p>Find stores and services near you with real-time availability.</p>
             <a href="/map" className="card-link">Go to Map</a>
           </div>
 
-          <div className="service-card">
+          <div className="card">
             <div className="card-icon">✨</div>
             <h2>Discover</h2>
             <p>Browse curated finds and trending products tailored to your needs.</p>
             <a href="/discover" className="card-link">Explore</a>
           </div>
 
-          <div className="service-card">
+          <div className="card">
             <div className="card-icon">📦</div>
             <h2>Products</h2>
             <p>Access our complete catalog of home essentials and tools.</p>
             <a href="/products" className="card-link">Shop Now</a>
           </div>
 
-          <div className="service-card">
+          <div className="card">
             <div className="card-icon">🛒</div>
             <h2>Cart</h2>
             <p>Review and manage all your saved and active items.</p>

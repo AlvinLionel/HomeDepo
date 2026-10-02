@@ -219,28 +219,13 @@ function Map() {
                 <div className="map-header-content">
                     <h1>Find Stores & Services</h1>
                     <form className="search-wrapper" onSubmit={handleStoreSearch}>
-                        <input
-                            type="text"
-                            className="search-input"
-                            placeholder="Search by store name, address, or type..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <button
-                            type="submit"
-                            className="search-submit"
-                            disabled={isSearching}
-                        >
+                        <input type="text" className="search-input" placeholder="Search by store name, address, or type..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        <button type="submit" className="search-submit" disabled={isSearching}>
                             {isSearching ? "Searching..." : "Search"}
                         </button>
                     </form>
                     <div className="location-controls">
-                        <button
-                            type="button"
-                            className="location-button"
-                            onClick={requestUserLocation}
-                            disabled={isGettingLocation}
-                        >
+                        <button type="button" className="location-button" onClick={requestUserLocation} disabled={isGettingLocation}>
                             {isGettingLocation
                                 ? "Finding your location..."
                                 : userLocation
@@ -248,26 +233,13 @@ function Map() {
                                     : "Use my location"}
                         </button>
 
-                        {userLocation && (
-                            <p className="location-status">Your location is ready for nearby store searches.</p>
-                        )}
-                        {locationError && (
-                            <p className="location-error" role="alert">{locationError}</p>
-                        )}
+                        {userLocation && (<p className="location-status">Your location is ready for nearby store searches.</p>)}
+                        {locationError && (<p className="location-error" role="alert">{locationError}</p>)}
                     </div>
                     {!userLocation && (
                         <div className="manual-location">
-                            <label htmlFor="manualLocation">
-                                Search near a city, town, or area
-                            </label>
-
-                            <input
-                                id="manualLocation"
-                                type="text"
-                                value={manualLocation}
-                                onChange={(event) => setManualLocation(event.target.value)}
-                                placeholder="For example: Nairobi, Westlands, or Mombasa"
-                            />
+                            <label htmlFor="manualLocation">Search near a city, town, or area</label>
+                            <input id="manualLocation" type="text" value={manualLocation} onChange={(event) => setManualLocation(event.target.value)} placeholder="For example: Nairobi, Westlands, or Mombasa" />
                         </div>
                     )}
                 </div>
@@ -283,11 +255,7 @@ function Map() {
                     <div className="stores-list">
                         {displayedStores.length > 0 ? (
                             displayedStores.map((store) => (
-                                <div
-                                    key={store.id}
-                                    className={`store-card ${selectedStore?.id === store.id ? "active" : ""} `}
-                                    onClick={() => setSelectedStore(store)}
-                                >
+                                <div key={store.id} className={`store-card ${selectedStore?.id === store.id ? "active" : ""} `} onClick={() => setSelectedStore(store)}>
                                     <div className="store-header">
                                         <div className="store-title-section">
                                             <h3>{store.name}</h3>
@@ -295,12 +263,7 @@ function Map() {
                                         </div>
                                         <div className="store-badges">
                                             {getBadges(store).map((badge) => (
-                                                <span
-                                                    key={badge}
-                                                    className={`badge badge-${badge
-                                                        .toLowerCase()
-                                                        .replace(" ", "-")}`}
-                                                >
+                                                <span key={badge} className={`badge badge-${badge.toLowerCase().replace(" ", "-")}`}>
                                                     {badge === "Closest" && "📍"}
                                                     {badge === "Top Rated" && "⭐"}
                                                     {badge === "Open Now" && "🟢"}
@@ -337,11 +300,7 @@ function Map() {
                                             </a>
                                         )}
 
-                                        <button
-                                            className="action-btn directions-btn"
-                                            onClick={(event) => handleDirections(event, store.address)}
-                                            title="Get directions"
-                                        >
+                                        <button className="action-btn directions-btn" onClick={(event) => handleDirections(event, store.address)} title="Get directions">
                                             🗺️
                                         </button>
 
@@ -359,10 +318,7 @@ function Map() {
                                             </a>
                                         )}
 
-                                        <button
-                                            className="view-button"
-                                            onClick={(event) => handleViewOnMap(event, store)}
-                                        >
+                                        <button className="view-button" onClick={(event) => handleViewOnMap(event, store)}>
                                             View on Map
                                         </button>
                                     </div>
