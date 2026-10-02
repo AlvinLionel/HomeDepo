@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch server.js --watch .env --exec \"node server.js\"",
+    "dev": "nodemon --watch server.js --watch db.js --watch .env --exec \"node server.js\"",
     "start": "node server.js"
   },
   "keywords": [],

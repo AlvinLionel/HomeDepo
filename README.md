@@ -56,11 +56,9 @@ cd Database
 # Initialize the database using your MySQL client
 mysql -u your_username -p < schema.sql
 
-# Or run the init.js file (ensure Node.js is installed)
-node init.js
 ```
 
-> **Note:** Update your MySQL credentials in the `.env` file before running init.js
+Configure the MySQL connection settings in the backend `.env` file before starting the server.
 
 ### 3. Setup Backend
 
@@ -87,6 +85,8 @@ npm run dev
 ```
 
 The backend will run on `http://localhost:5000`
+
+All backend persistence queries and MySQL connection handling live in `Backend/db.js`. `server.js` uses its data-access functions so routes do not depend directly on MySQL. Switching database providers is therefore isolated from route logic, though the new provider may also require schema, environment, or dependency changes.
 
 ### 4. Setup Frontend
 
@@ -124,6 +124,7 @@ homeDepo-proj/
 │
 ├── Backend/                 # Express.js backend
 │   ├── server.js            # Main server file
+│   ├── db.js                # Database connection and data-access layer
 │   ├── .env                 # Environment variables
 │   ├── tsconfig.json        # TypeScript config
 │   ├── nodemon.json         # Nodemon config

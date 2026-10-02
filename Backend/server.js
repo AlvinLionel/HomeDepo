@@ -3,8 +3,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
 const crypto = require("crypto");
-const mysql = require("mysql2/promise");
-
+const db = require("./db");
 const { sendResetEmail } = require("./mailHandler");
 
 dotenv.config({ path: path.join(__dirname, ".env") });
@@ -16,41 +15,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());
 
-const dbConfig = {
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
-
-const pool = mysql.createPool(dbConfig);
-let dbReady = false;
-let dbMessage = "Database not initialized";
-
-async function checkDatabaseConnection() {
-  try {
-    const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
-
-    dbReady = true;
-    dbMessage = "Database connection successful";
-    console.log("Connected to database successfully");
-  } catch (error) {
-    dbReady = false;
-    dbMessage = error.message;
-    console.error("Database connection failed:", error.message);
-  }
-}
-checkDatabaseConnection();
-
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
+db.checkDatabaseConnection();
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
 const NOMINATIM_USER_AGENT = process.env.NOMINATIM_USER_AGENT;
@@ -84,6 +49,7 @@ function buildViewbox(latitude, longitude, radiusKm = 10) {
 }
 
 app.get("/api/health", (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
   res.json({ status: "ok", dbReady, message: dbMessage });
 });
 
@@ -183,6 +149,7 @@ app.get("/api/stores/search", async (req, res) => {
 });
 
 app.post("/api/auth/signup", async (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
   if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { username, email, password } = req.body || {};
@@ -190,26 +157,14 @@ app.post("/api/auth/signup", async (req, res) => {
   if (!username || !email || !password) return res.status(400).json({ message: "Username, email, and password are required." });
 
   try {
-    const [existingUsers] = await pool.query(
-      "SELECT id FROM users WHERE email = ? OR username = ?",
-      [email, username]
-    );
+    const userExists = await db.findUserByEmailOrUsername(email, username);
+    if (userExists) return res.status(409).json({ message: "A user with that email or username already exists." });
 
-    if (existingUsers.length > 0) return res.status(409).json({ message: "A user with that email or username already exists." });
-
-    const passwordHash = hashPassword(password);
-    const [result] = await pool.query(
-      "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-      [username, email, passwordHash]
-    );
+    const user = await db.createUser(username, email, password);
 
     res.status(201).json({
       message: "User created successfully",
-      user: {
-        id: result.insertId,
-        username,
-        email,
-      },
+      user,
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -218,6 +173,7 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
   if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { email, password } = req.body || {};
@@ -225,21 +181,11 @@ app.post("/api/auth/login", async (req, res) => {
   if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
 
   try {
-    const passwordHash = hashPassword(password);
-    const [rows] = await pool.query(
-      "SELECT id, username, email FROM users WHERE email = ? AND password_hash = ? LIMIT 1",
-      [email, passwordHash]
-    );
-
-    if (rows.length === 0) return res.status(401).json({ message: "Invalid email or password." });
-
-    const user = rows[0];
+    const user = await db.findUserByCredentials(email, password);
+    if (!user) return res.status(401).json({ message: "Invalid email or password." });
     const device = (req.get("user-agent") || "Unknown device").slice(0, 255);
 
-    await pool.query(
-      `UPDATE users SET last_login_at = UTC_TIMESTAMP(), last_login_device = ? WHERE id = ?`,
-      [device, user.id]
-    );
+    await db.updateLastLogin(user.id, device);
 
     res.json({
       message: "Login successful",
@@ -256,19 +202,17 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/check-email", async (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
   if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: "Email is required" });
 
   try {
-    const [rows] = await pool.query(
-      "SELECT id from users WHERE email = ? LIMIT 1",
-      [email]
-    );
-    if (rows.length === 0) res.status(404).json({ message: "Email not found" });
+    const userId = await db.getUserIdByEmail(email);
+    if (userId === null) return res.status(404).json({ message: "Email not found" });
 
-    res.json({ message: "Email exists", userId: rows[0].id });
+    res.json({ message: "Email exists", userId });
   } catch (error) {
     console.error("Check email error:", error);
     res.status(500).json({ message: "Unable to check email.", error: error.message });
@@ -276,20 +220,16 @@ app.post("/api/auth/check-email", async (req, res) => {
 });
 
 app.post("/api/auth/reset-password", async (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
   if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
 
   const { token, newPassword } = req.body || {};
   if (!token || !newPassword) return res.status(400).json({ message: "Token and password are required." });
 
   try {
-    const [rows] = await pool.query("SELECT user_id, expires_at FROM reset_tokens WHERE token = ? LIMIT 1", [token]);
-    if (rows.length === 0) return res.status(404).json({ message: "Invalid token." });
-
-    if (new Date(rows[0].expires_at) < new Date()) return res.status(400).json({ message: "Token expired." });
-
-    const passwordHash = hashPassword(newPassword);
-    await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, rows[0].user_id]);
-    await pool.query("DELETE FROM reset_tokens WHERE token = ?", [token]);
+    const result = await db.resetPassword(token, newPassword);
+    if (result === "invalid") return res.status(404).json({ message: "Invalid token." });
+    if (result === "expired") return res.status(400).json({ message: "Token expired." });
 
     res.json({ message: "Password reset successful." });
   } catch (error) {
@@ -299,18 +239,21 @@ app.post("/api/auth/reset-password", async (req, res) => {
 });
 
 app.post("/api/auth/request-reset", async (req, res) => {
+  const { dbReady, dbMessage } = db.getStatus();
+  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
+
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: "Email is required." });
 
   try {
-    const [rows] = await pool.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
-    if (rows.length === 0) return res.status(404).json({ message: "Email not found" });
+    const userId = await db.getUserIdByEmail(email);
+    if (userId === null) return res.status(404).json({ message: "Email not found" });
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     const device = (req.get("user-agent") || "Unknown device").slice(0, 255);
 
-    await pool.query("INSERT INTO reset_tokens(user_id,token,expires_at, device) VALUES (?,?,?,?)", [rows[0].id, token, expiresAt, device]);
+    await db.createResetToken(userId, token, expiresAt, device);
 
     await sendResetEmail(email, token);
 
