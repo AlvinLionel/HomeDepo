@@ -25,6 +25,16 @@ interface Department {
     group: DepartmentGroup;
     searchTerms: string;
 }
+interface Product {
+    id: number;
+    name: string;
+    description: string;
+    brand: string;
+    unit: string;
+    imageUrl: string;
+    startingPrice: number;
+    storeCount: number;
+}
 
 const departments: Department[] = [
     {
@@ -130,11 +140,44 @@ function Products() {
     const { categorySlug } = useParams<{ categorySlug: string }>();
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState<DepartmentGroup | "all">("all");
+    const [products, setProducts] = useState<Product[]>([]);
+    const [productsLoading, setProductsLoading] = useState(false);
+    const [productsError, setProductsError] = useState("");
 
     useEffect(() => {
         document.body.classList.add("products-page-body");
         return () => document.body.classList.remove("products-page-body");
     }, []);
+    useEffect(() => {
+        if (!categorySlug) {
+            setProducts([]);
+            setProductsError("");
+            return;
+        }
+
+        const fetchProducts = async () => {
+            try {
+                setProductsLoading(true);
+                setProductsError("");
+
+                const response = await fetch(`http://localhost:5000/api/products/department/${categorySlug}`);
+
+                if (!response.ok) throw new Error("Failed to load products");
+
+                const data = await response.json();
+
+                setProducts(data.products);
+            } catch (error) {
+                console.error("Error fetching department products:", error);
+                setProductsError("We couldn't load the products for this department.");
+                setProducts([]);
+            } finally {
+                setProductsLoading(false);
+            }
+        };
+
+        fetchProducts();
+    }, [categorySlug]);
 
     const selectedDepartment = departments.find(({ slug }) => slug === categorySlug);
     const visibleDepartments = useMemo(() => {
@@ -156,19 +199,80 @@ function Products() {
                         <span aria-hidden="true">←</span> All departments
                     </Link>
                     {selectedDepartment ? (
-                        <section className="department-placeholder" aria-labelledby="department-title">
-                            <img src={selectedDepartment.image} alt="" />
-                            <div className="department-placeholder-copy">
-                                <span className="products-eyebrow">Department</span>
-                                <h1 id="department-title">{selectedDepartment.name}</h1>
-                                <p>
-                                    {selectedDepartment.description} The catalogue for this department is
-                                    coming soon.
+                        <section className="department-catalogue" aria-labelledby="department-title">
+                            <div className="department-catalogue-header">
+                                <div className="department-catalogue-intro">
+                                    <img
+                                        className="department-catalogue-image"
+                                        src={selectedDepartment.image}
+                                        alt=""
+                                    />
+                                    <div className="department-catalogue-copy">
+                                        <span className="products-eyebrow">Department</span>
+                                        <h1 id="department-title">{selectedDepartment.name}</h1>
+                                        <p>{selectedDepartment.description}</p>
+                                    </div>
+                                </div>
+
+                                <p className="department-product-count" aria-live="polite">
+                                    {productsLoading
+                                        ? "Loading products..."
+                                        : `${products.length} ${products.length === 1 ? "product" : "products"
+                                        }`
+                                    }
                                 </p>
-                                <Link className="department-back-button" to="/products">
-                                    Browse all departments <span aria-hidden="true">→</span>
-                                </Link>
                             </div>
+
+                            {productsLoading ? (
+                                <div className="department-loading">
+                                    <p>Finding products from nearby stores...</p>
+                                </div>
+                            ) : productsError ? (
+                                <div className="department-error">
+                                    <h2>Something went wrong</h2>
+                                    <p>{productsError}</p>
+                                </div>
+                            ) : products.length > 0 ? (
+                                <div className="product-grid">
+                                    {products.map((product) => (
+                                        <Link className="product-card" key={product.id} to={`/product/${product.id}`}>
+                                            <div className="product-card-image">
+                                                <img
+                                                    src={product.imageUrl}
+                                                    alt=""
+                                                    loading="lazy"
+                                                    onError={(event) => {
+                                                        event.currentTarget.onerror = null;
+                                                        event.currentTarget.src = selectedDepartment.image;
+                                                    }}
+                                                />
+                                            </div>
+
+                                            <div className="product-card-copy">
+                                                <span className="product-card-brand"> {product.brand}</span>
+                                                <h2>{product.name}</h2>
+                                                <p>{product.description}</p>
+
+                                                <div className="product-card-meta">
+                                                    <strong>
+                                                        From KSh{" "}
+                                                        {product.startingPrice.toLocaleString()}
+                                                    </strong>
+                                                    <span>
+                                                        {product.storeCount}{" "}
+                                                        {product.storeCount === 1 ? "store" : "stores"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="department-empty-state">
+                                    <h2>No products available</h2>
+                                    <p>There are currently no available products in this department.</p>
+                                </div>
+                            )}
                         </section>
                     ) : (
                         <section className="department-not-found">

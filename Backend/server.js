@@ -25,6 +25,18 @@ const SEARCH_CACHE_TTL_MS = 60_000;
 const storeSearchCache = new Map();
 let nextNominatimRequestAt = 0;
 
+function requireDatabase(req, res, next) {
+  const { dbReady, dbMessage } = db.getStatus();
+
+  if (!dbReady) {
+    return res.status(503).json({
+      message: "Database is not ready yet.",
+      detail: dbMessage
+    });
+  }
+  next();
+}
+
 function waitForNominatimSlot() {
   const now = Date.now();
   const scheduledAt = Math.max(now, nextNominatimRequestAt);
@@ -61,19 +73,16 @@ app.get("/api/stores/search", async (req, res) => {
 
   if (query.length < 2) {
     return res.status(400).json({
-      message: "Please enter at least two characters to search for stores.",
+      message: "Please enter at least two characters to search for stores."
     });
   }
 
   if (!NOMINATIM_USER_AGENT) return res.status(500).json({ message: "Nominatim user agent is not configured on the server." });
 
   const hasValidLocation =
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude) &&
-    latitude >= -90 &&
-    latitude <= 90 &&
-    longitude >= -180 &&
-    longitude <= 180;
+    Number.isFinite(latitude) && Number.isFinite(longitude) &&
+    latitude >= -90 && latitude <= 90 &&
+    longitude >= -180 && longitude <= 180;
 
   const locationAwareQuery = !hasValidLocation && location ? `${query} in ${location}` : query;
 
@@ -118,10 +127,7 @@ app.get("/api/stores/search", async (req, res) => {
 
     const stores = places.map((place) => ({
       id: `osm-${place.osm_type}-${place.osm_id}`,
-      name:
-        place.namedetails?.name ||
-        place.display_name.split(",")[0] ||
-        "Unnamed place",
+      name: place.namedetails?.name || place.display_name.split(",")[0] || "Unnamed place",
       address: place.display_name,
       latitude: Number(place.lat),
       longitude: Number(place.lon),
@@ -148,10 +154,7 @@ app.get("/api/stores/search", async (req, res) => {
   }
 });
 
-app.post("/api/auth/signup", async (req, res) => {
-  const { dbReady, dbMessage } = db.getStatus();
-  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-
+app.post("/api/auth/signup", requireDatabase, async (req, res) => {
   const { username, email, password } = req.body || {};
 
   if (!username || !email || !password) return res.status(400).json({ message: "Username, email, and password are required." });
@@ -172,10 +175,7 @@ app.post("/api/auth/signup", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
-  const { dbReady, dbMessage } = db.getStatus();
-  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-
+app.post("/api/auth/login", requireDatabase, async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
@@ -201,10 +201,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.post("/api/auth/check-email", async (req, res) => {
-  const { dbReady, dbMessage } = db.getStatus();
-  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-
+app.post("/api/auth/check-email", requireDatabase, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: "Email is required" });
 
@@ -219,10 +216,7 @@ app.post("/api/auth/check-email", async (req, res) => {
   }
 });
 
-app.post("/api/auth/reset-password", async (req, res) => {
-  const { dbReady, dbMessage } = db.getStatus();
-  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-
+app.post("/api/auth/reset-password", requireDatabase, async (req, res) => {
   const { token, newPassword } = req.body || {};
   if (!token || !newPassword) return res.status(400).json({ message: "Token and password are required." });
 
@@ -238,10 +232,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 });
 
-app.post("/api/auth/request-reset", async (req, res) => {
-  const { dbReady, dbMessage } = db.getStatus();
-  if (!dbReady) return res.status(503).json({ message: "Database is not ready yet.", detail: dbMessage });
-
+app.post("/api/auth/request-reset", requireDatabase, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: "Email is required." });
 
@@ -263,6 +254,77 @@ app.post("/api/auth/request-reset", async (req, res) => {
     res.status(500).json({ message: "Unable to send reset email.", error: err.message });
   }
 })
+
+app.get("/api/products/department/:departmentSlug", requireDatabase, async (req, res) => {
+  const departmentSlug = req.params.departmentSlug?.trim();
+
+  if (!departmentSlug) return res.status(400).json({ message: "Department is required." });
+
+  try {
+    const products = await db.getProductsByDepartment(departmentSlug);
+
+    res.json({ department: departmentSlug, products });
+  } catch (error) {
+    console.error("Get department products error:", error);
+
+    res.status(500).json({
+      message: "Unable to fetch department products.",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/api/products/:productId", requireDatabase, async (req, res) => {
+  const productId = Number(req.params.productId);
+
+  if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Invalid product ID." });
+
+  try {
+    const product = await db.getProductById(productId);
+
+    if (!product) return res.status(404).json({ message: "Product not found.", });
+
+    res.json(product);
+  } catch (error) {
+    console.error("Get product error:", error);
+
+    res.status(500).json({
+      message: "Unable to fetch product.",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/api/stores/:storeId/products", requireDatabase, async (req, res) => {
+  const storeId = Number(req.params.storeId);
+
+  if (!Number.isInteger(storeId) || storeId <= 0) {
+    return res.status(400).json({
+      message: "Invalid store ID."
+    });
+  }
+
+  try {
+    const store = await db.getStoreById(storeId);
+
+    if (!store) {
+      return res.status(404).json({
+        message: "Store not found.",
+      });
+    }
+
+    const products = await db.getProductsByStore(storeId);
+
+    res.json({ store, products });
+  } catch (error) {
+    console.error("Get store products error:", error);
+
+    res.status(500).json({
+      message: "Unable to fetch store products.",
+      error: error.message,
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT} as at ${new Date().toLocaleTimeString()}`);

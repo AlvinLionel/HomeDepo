@@ -1,0 +1,128 @@
+.product-details-page {
+    min-height: 100vh;
+}
+
+.product-details-main {
+    width: min(1200px, 92%);
+    margin: 0 auto;
+    padding: 40px 0 80px;
+}
+
+.product-details-back {
+    display: inline-block;
+    margin-bottom: 32px;
+    text-decoration: none;
+}
+
+.product-details {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.product-details-info > span {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.7;
+}
+
+.product-details-info h1 {
+    margin: 0 0 16px;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.product-details-info > p {
+    max-width: 700px;
+    margin: 0;
+    line-height: 1.7;
+}
+
+.product-store-heading {
+    margin-top: 40px;
+    margin-bottom: 20px;
+}
+
+.product-store-list {
+    display: grid;
+    gap: 24px;
+}
+
+.product-store {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 28px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.product-store-image {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.product-store-image img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.product-store-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.product-store-info h2 {
+    margin: 0 0 8px;
+    font-size: 1.25rem;
+}
+
+.product-store-info > p {
+    margin: 0;
+    line-height: 1.5;
+    opacity: 0.75;
+}
+
+.product-store-purchase {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.product-store-purchase strong {
+    font-size: 1.25rem;
+}
+
+.product-store-purchase span {
+    font-size: 0.9rem;
+    opacity: 0.75;
+}
+
+.product-details-error {
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .product-details-main {
+        padding-top: 24px;
+    }
+
+    .product-store {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .product-store-image {
+        aspect-ratio: 16 / 10;
+    }
+
+    .product-store-purchase {
+        flex-wrap: wrap;
+    }
+}
