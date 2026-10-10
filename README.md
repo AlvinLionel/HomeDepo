@@ -50,10 +50,8 @@ cd homeDepo-proj
 ### 2. Setup Database
 
 ```bash
-# Navigate to the Database folder
 cd Database
 
-# Initialize the database using your MySQL client
 mysql -u your_username -p < schema.sql
 
 ```
@@ -65,22 +63,18 @@ Configure the MySQL connection settings in the backend `.env` file before starti
 ```bash
 cd Backend
 
-# Install dependencies
 npm install
 
-# Create a .env file in the Backend folder
-# Add the following environment variables:
 cat > .env << EOF
 PORT=5000
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=root
+DB_USER=username
 DB_PASSWORD=your_password
-DB_NAME=homedepot
+DB_NAME=homedepo
 FRONTEND_URL=http://localhost:5173
 EOF
 
-# Start the backend development server
 npm run dev
 ```
 
@@ -93,14 +87,14 @@ All backend persistence queries and MySQL connection handling live in `Backend/d
 ```bash
 cd Frontend
 
-# Install dependencies
 npm install
 
-# Start the development server
 npm run dev
 ```
 
 The frontend will run on `http://localhost:5173` and automatically open in your browser.
+
+Department card images are optimized local downloads from Unsplash and are used under the [Unsplash License](https://unsplash.com/license).
 
 ## 🏗️ Project Structure
 
