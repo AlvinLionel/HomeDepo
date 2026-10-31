@@ -37,3 +37,7 @@ Images/
 
 #Others folder
 *.txt
+
+#Postman files
+.postman
+postman/
