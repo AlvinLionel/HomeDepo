@@ -535,18 +535,33 @@ body.products-page-body #root {
 }
 
 .department-back-link {
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  color: #82543a;
-  font-size: 0.93rem;
-  font-weight: 650;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #e6d8c8;
+  border-radius: 999px;
+  background: #fffdfa;
+  color: #805039;
+  font-size: 0.84rem;
+  font-weight: 700;
   text-decoration: none;
+  box-shadow: 0 4px 12px rgba(73, 52, 33, 0.04);
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .department-back-link:hover {
-  color: #a85a2e;
+  transform: translateY(-1px);
+  border-color: #c99a78;
+  background: #f7eee4;
+  color: #75452e;
+}
+
+.department-back-link:focus-visible {
+  outline: 3px solid rgba(168, 90, 55, 0.3);
+  outline-offset: 3px;
 }
 
 .department-placeholder {
