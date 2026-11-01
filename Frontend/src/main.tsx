@@ -17,6 +17,7 @@ import Moderation from "./Moderation";
 import MerchantPortal from "./MerchantPortal";
 import Settings from "./Settings";
 import Support from "./Support";
+import Services from "./Services";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/auth" element={<Auth />} />
             <Route path="/Home" element={<Home/>} />
             <Route path="/map" element={<Map/>} />
+            <Route path="/services" element={<Services/>} />
             <Route path="/products" element={<Products/>} />
             <Route path="/products/:categorySlug" element={<Products/>} />
             <Route path="/discover" element={<Discover/>} />

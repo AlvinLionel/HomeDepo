@@ -25,13 +25,68 @@ app.use(express.json({ limit: "1.5mb" }));
 db.checkDatabaseConnection();
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+const OVERPASS_API_URL = "https://overpass-api.de/api/interpreter";
 const NOMINATIM_USER_AGENT = process.env.NOMINATIM_USER_AGENT;
 const NOMINATIM_MIN_INTERVAL_MS = 1100;
 const SEARCH_CACHE_TTL_MS = 60_000;
+const PLACE_CACHE_TTL_MS = 5 * 60_000;
+const OVERPASS_MIN_INTERVAL_MS = 1_000;
+const PLACE_CATEGORY_TAGS = {
+  home_services: [
+    { key: "shop", values: ["appliance", "electronics", "cleaning", "laundry", "dry_cleaning", "hairdresser", "barber", "beauty", "car_repair", "tyres"] },
+    { key: "craft", values: ["electronics_repair", "cleaning", "car_repair", "plumber", "electrician"] },
+    { key: "amenity", values: ["car_repair"] },
+  ],
+  appliance_repair: [
+    { key: "shop", values: ["appliance", "electronics"] },
+    { key: "craft", values: ["electronics_repair"] },
+  ],
+  cleaning: [
+    { key: "shop", values: ["cleaning"] },
+    { key: "craft", values: ["cleaning"] },
+  ],
+  laundry: [{ key: "shop", values: ["laundry", "dry_cleaning"] }],
+  personal_care: [{ key: "shop", values: ["hairdresser", "barber", "beauty"] }],
+  automotive: [
+    { key: "shop", values: ["car_repair", "tyres"] },
+    { key: "craft", values: ["car_repair"] },
+    { key: "amenity", values: ["car_repair"] },
+  ],
+  leisure: [
+    { key: "leisure", values: ["park", "playground", "sports_centre", "pitch", "swimming_pool", "nature_reserve", "garden"] },
+    { key: "natural", values: ["wood", "beach"] },
+    { key: "tourism", values: ["picnic_site", "camp_site", "attraction"] },
+    { key: "route", values: ["hiking", "foot"] },
+    { key: "shop", values: ["marketplace"] },
+    { key: "amenity", values: ["marketplace"] },
+  ],
+  parks: [
+    { key: "leisure", values: ["park", "nature_reserve", "garden"] },
+    { key: "natural", values: ["wood", "beach"] },
+    { key: "tourism", values: ["picnic_site", "camp_site", "attraction"] },
+    { key: "route", values: ["hiking", "foot"] },
+  ],
+  playgrounds: [{ key: "leisure", values: ["playground"] }],
+  sports: [{ key: "leisure", values: ["sports_centre", "pitch"] }],
+  pools: [{ key: "leisure", values: ["swimming_pool"] }],
+  trails: [
+    { key: "route", values: ["hiking", "foot"] },
+    { key: "leisure", values: ["nature_reserve"] },
+    { key: "natural", values: ["wood"] },
+  ],
+  markets: [
+    { key: "shop", values: ["marketplace", "supermarket", "convenience", "greengrocer"] },
+    { key: "amenity", values: ["marketplace"] },
+  ],
+};
 
 const storeSearchCache = new Map();
+const placeSearchCache = new Map();
+const reverseGeocodeCache = new Map();
 const supportRequestAttempts = new Map();
 let nextNominatimRequestAt = 0;
+let nextOverpassRequestAt = 0;
 const SUPPORT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const SUPPORT_RATE_LIMIT_MAX = 3;
 
@@ -109,6 +164,15 @@ function waitForNominatimSlot() {
   });
 }
 
+function waitForOverpassSlot() {
+  const now = Date.now();
+  const scheduledAt = Math.max(now, nextOverpassRequestAt);
+  nextOverpassRequestAt = scheduledAt + OVERPASS_MIN_INTERVAL_MS;
+  return new Promise((resolve) => {
+    setTimeout(resolve, scheduledAt - now);
+  });
+}
+
 function buildViewbox(latitude, longitude, radiusKm = 10) {
   const latitudeDelta = radiusKm / 111;
   const longitudeDelta = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180));
@@ -121,9 +185,64 @@ function buildViewbox(latitude, longitude, radiusKm = 10) {
   return `${west},${north},${east},${south}`;
 }
 
+function getPlaceOverpassQuery(category, latitude, longitude, radiusMeters) {
+  const filters = PLACE_CATEGORY_TAGS[category];
+  if (!filters) throw new Error("Unsupported place category.");
+
+  const selectors = filters.map(({ key, values }) =>
+    `nwr(around:${radiusMeters},${latitude},${longitude})[${key}~"^(${values.join("|")})$"];`
+  );
+  return `[out:json][timeout:20];(${selectors.join("")});out center tags 80;`;
+}
+
+function calculateDistanceKm(latitude, longitude, otherLatitude, otherLongitude) {
+  const latitudeDifference = ((otherLatitude - latitude) * Math.PI) / 180;
+  const longitudeDifference = ((otherLongitude - longitude) * Math.PI) / 180;
+  const a = Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos((latitude * Math.PI) / 180) *
+    Math.cos((otherLatitude * Math.PI) / 180) *
+    Math.sin(longitudeDifference / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getOsmPlaceAddress(tags) {
+  if (tags["addr:full"]) return tags["addr:full"];
+  return [
+    [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" "),
+    tags["addr:suburb"],
+    tags["addr:city"] || tags["addr:town"] || tags["addr:village"],
+    tags["addr:postcode"],
+  ].filter(Boolean).join(", ");
+}
+
 app.get("/api/health", (req, res) => {
   const { dbReady, dbMessage } = db.getStatus();
   res.json({ status: "ok", dbReady, message: dbMessage });
+});
+
+app.get("/api/openapi.yaml", (req, res, next) => {
+  res.sendFile(path.join(__dirname, "openapi.yaml"), (error) => {
+    if (error) next(error);
+  });
+});
+
+app.get("/api/docs", (req, res) => {
+  res.type("html").send(`<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HomeX API documentation</title>
+        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+        <style>body{margin:0}#homex-api-note{padding:12px 24px;color:#625044;background:#faf8f4;font:14px/1.5 system-ui,sans-serif}</style>
+      </head>
+      <body>
+        <div id="homex-api-note">Interactive HomeX API reference. The machine-readable OpenAPI file is available at <a href="/api/openapi.yaml">/api/openapi.yaml</a>.</div>
+        <div id="swagger-ui"></div>
+        <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+        <script>window.onload=()=>window.SwaggerUIBundle({url:"/api/openapi.yaml",dom_id:"#swagger-ui"});</script>
+      </body>
+    </html>`);
 });
 
 app.get("/api/support/contact", (req, res) => {
@@ -338,6 +457,283 @@ app.get("/api/stores/search", async (req, res) => {
   } catch (error) {
     console.error("Store search error:", error.message);
     res.status(502).json({ message: "Unable to search for nearby stores right now." });
+  }
+});
+
+app.get("/api/location/reverse", async (req, res) => {
+  const latitude = Number(req.query.lat);
+  const longitude = Number(req.query.lng);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+      !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ message: "Provide valid latitude and longitude coordinates." });
+  }
+  if (!NOMINATIM_USER_AGENT) {
+    return res.status(500).json({ message: "Location lookup is not configured on the server." });
+  }
+
+  const cacheKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+  const cached = reverseGeocodeCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < PLACE_CACHE_TTL_MS) {
+    return res.json({ address: cached.address, area: cached.area, source: "OpenStreetMap", cached: true });
+  }
+
+  try {
+    await waitForNominatimSlot();
+    const searchParams = new URLSearchParams({
+      lat: String(latitude),
+      lon: String(longitude),
+      format: "jsonv2",
+      zoom: "18",
+      addressdetails: "1",
+    });
+    const response = await fetch(`${NOMINATIM_REVERSE_URL}?${searchParams}`, {
+      headers: { "User-Agent": NOMINATIM_USER_AGENT, Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`Nominatim returned status ${response.status}`);
+    const place = await response.json();
+    if (typeof place.display_name !== "string" || !place.display_name) {
+      return res.status(404).json({ message: "No address could be found for that location." });
+    }
+
+    const addressDetails = place.address || {};
+    const area = addressDetails.neighbourhood || addressDetails.suburb ||
+      addressDetails.city_district || addressDetails.city || addressDetails.town ||
+      addressDetails.village || addressDetails.county || "";
+    const reverseResult = { address: place.display_name, area };
+    reverseGeocodeCache.set(cacheKey, { createdAt: Date.now(), ...reverseResult });
+    res.json({ ...reverseResult, source: "OpenStreetMap", cached: false });
+  } catch (error) {
+    console.error("Reverse geocoding error:", error);
+    res.status(502).json({ message: "Unable to look up that address right now." });
+  }
+});
+
+app.get("/api/places/search", async (req, res) => {
+  const category = typeof req.query.category === "string" ? req.query.category : "home_services";
+  const area = typeof req.query.area === "string" ? req.query.area.trim().replace(/\s+/g, " ") : "";
+  const hasLatitude = req.query.lat !== undefined;
+  const hasLongitude = req.query.lng !== undefined;
+  let latitude = Number(req.query.lat);
+  let longitude = Number(req.query.lng);
+  const requestedRadius = req.query.radiusKm === undefined ? 5 : Number(req.query.radiusKm);
+
+  if (!Object.hasOwn(PLACE_CATEGORY_TAGS, category)) {
+    return res.status(400).json({ message: "Choose a valid nearby service or place category." });
+  }
+  if (area.length > 100) {
+    return res.status(400).json({ message: "Area must be 100 characters or fewer." });
+  }
+  if (!Number.isFinite(requestedRadius) || requestedRadius < 1 || requestedRadius > 25) {
+    return res.status(400).json({ message: "Search radius must be between 1 and 25 kilometres." });
+  }
+  if (hasLatitude !== hasLongitude) {
+    return res.status(400).json({ message: "Provide both latitude and longitude coordinates." });
+  }
+  if (hasLatitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+      !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+    return res.status(400).json({ message: "Provide valid latitude and longitude coordinates." });
+  }
+  if (!hasLatitude && area.length < 2) {
+    return res.status(400).json({ message: "Use your location or enter an area to discover nearby places." });
+  }
+  if (!hasLatitude) {
+    if (!NOMINATIM_USER_AGENT) {
+      return res.status(500).json({ message: "Location search is not configured on the server." });
+    }
+    try {
+      await waitForNominatimSlot();
+      const searchParams = new URLSearchParams({
+        q: area,
+        format: "jsonv2",
+        limit: "1",
+      });
+      const response = await fetch(`${NOMINATIM_BASE_URL}?${searchParams}`, {
+        headers: { "User-Agent": NOMINATIM_USER_AGENT, Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`Nominatim returned status ${response.status}`);
+      const places = await response.json();
+      if (!places.length) return res.status(404).json({ message: "We couldn't find that area. Try a nearby town or neighborhood." });
+      latitude = Number(places[0].lat);
+      longitude = Number(places[0].lon);
+    } catch (error) {
+      console.error("Nearby place location lookup error:", error);
+      return res.status(502).json({ message: "Unable to find that area right now." });
+    }
+  }
+
+  const radiusKm = requestedRadius;
+  const cacheKey = `${category}:${latitude.toFixed(3)}:${longitude.toFixed(3)}:${radiusKm}`;
+  let osmPlaces = [];
+  const cached = placeSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < PLACE_CACHE_TTL_MS) {
+    osmPlaces = cached.places;
+  } else {
+    try {
+      const overpassQuery = getPlaceOverpassQuery(category, latitude, longitude, Math.round(radiusKm * 1000));
+      await waitForOverpassSlot();
+      const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), 25_000);
+      let result;
+      try {
+        const response = await fetch(OVERPASS_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({ data: overpassQuery }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Overpass returned status ${response.status}`);
+        result = await response.json();
+      } finally {
+        clearTimeout(requestTimeout);
+      }
+      const seen = new Set();
+      osmPlaces = (Array.isArray(result.elements) ? result.elements : []).flatMap((element) => {
+        const id = `osm-${element.type}-${element.id}`;
+        if (seen.has(id)) return [];
+        seen.add(id);
+        const tags = element.tags || {};
+        const point = element.center || element;
+        const placeLatitude = Number(point.lat);
+        const placeLongitude = Number(point.lon);
+        if (!Number.isFinite(placeLatitude) || !Number.isFinite(placeLongitude)) return [];
+        return [{
+          id,
+          source: "OpenStreetMap",
+          name: tags.name || tags["name:en"] || tags.brand || tags.operator ||
+            getOsmPlaceAddress(tags) || `Unnamed ${tags.shop || tags.amenity || tags.leisure || tags.tourism || tags.route || tags.craft || tags.natural || "place"}`,
+          category: tags.shop || tags.amenity || tags.leisure || tags.tourism || tags.route || tags.craft || tags.natural || "place",
+          description: "",
+          area: tags["addr:suburb"] || tags["addr:city"] || tags["addr:town"] || "",
+          address: getOsmPlaceAddress(tags),
+          phone: tags.phone || tags["contact:phone"] || null,
+          website: tags.website || tags["contact:website"] || null,
+          openingHours: tags.opening_hours || null,
+          latitude: placeLatitude,
+          longitude: placeLongitude,
+          distanceKm: calculateDistanceKm(latitude, longitude, placeLatitude, placeLongitude),
+        }];
+      });
+      placeSearchCache.set(cacheKey, { createdAt: Date.now(), places: osmPlaces });
+    } catch (error) {
+      console.error("Nearby place search error:", error);
+      return res.status(502).json({ message: "Unable to search OpenStreetMap for nearby places right now." });
+    }
+  }
+
+  try {
+    const communityServices = ["home_services", "appliance_repair", "cleaning", "laundry", "personal_care", "automotive"].includes(category)
+      ? await db.getApprovedCommunityServices({
+        category,
+        latitude,
+        longitude,
+        radiusKm,
+        limit: 50,
+      })
+      : [];
+    osmPlaces = osmPlaces.map((place) => ({
+      ...place,
+      distanceKm: calculateDistanceKm(latitude, longitude, place.latitude, place.longitude),
+    }));
+    res.json({
+      places: [...osmPlaces, ...communityServices],
+      center: { latitude, longitude, area },
+      radiusKm,
+      source: "OpenStreetMap and HomeX community",
+      cached: Boolean(cached && Date.now() - cached.createdAt < PLACE_CACHE_TTL_MS),
+    });
+  } catch (error) {
+    console.error("Load community services error:", error);
+    res.status(500).json({ message: "Unable to load HomeX community services." });
+  }
+});
+
+app.get("/api/services/mine", requireDatabase, requireUser, async (req, res) => {
+  try {
+    const services = await db.getUserCommunityServices(req.user.id);
+    res.json({ services });
+  } catch (error) {
+    console.error("Get community service submissions error:", error);
+    res.status(500).json({ message: "Unable to load your service submissions." });
+  }
+});
+
+app.post("/api/services/submissions", requireDatabase, requireUser, async (req, res) => {
+  const {
+    businessName,
+    category,
+    description,
+    area,
+    address,
+    phone,
+    website = "",
+    latitude,
+    longitude,
+  } = req.body || {};
+  const allowedCategories = new Set([
+    "appliance_repair", "cleaning", "laundry", "personal_care", "automotive", "other",
+  ]);
+  const numericLatitude = Number(latitude);
+  const numericLongitude = Number(longitude);
+
+  if (typeof businessName !== "string" || businessName.trim().length < 2 || businessName.trim().length > 150) {
+    return res.status(400).json({ message: "Enter a service or business name (2–150 characters)." });
+  }
+  if (!allowedCategories.has(category)) {
+    return res.status(400).json({ message: "Choose a valid home service category." });
+  }
+  if (typeof description !== "string" || description.trim().length < 10 || description.trim().length > 2000) {
+    return res.status(400).json({ message: "Describe your service in 10–2,000 characters." });
+  }
+  if (typeof area !== "string" || area.trim().length < 2 || area.trim().length > 100) {
+    return res.status(400).json({ message: "Enter the town or area you serve (2–100 characters)." });
+  }
+  if (typeof address !== "string" || address.trim().length < 2 || address.trim().length > 255) {
+    return res.status(400).json({ message: "Enter a service address or clear location description." });
+  }
+  if (typeof phone !== "string" || !/^\+?[\d\s()-]{7,20}$/.test(phone.trim())) {
+    return res.status(400).json({ message: "Enter a valid contact phone number." });
+  }
+  if (typeof website !== "string" || website.length > 500) {
+    return res.status(400).json({ message: "Website URL must be 500 characters or fewer." });
+  }
+  if (website.trim()) {
+    try {
+      const parsedWebsite = new URL(website.trim());
+      if (!["https:", "http:"].includes(parsedWebsite.protocol)) throw new Error("Invalid protocol");
+    } catch {
+      return res.status(400).json({ message: "Enter a valid website URL, or leave it blank." });
+    }
+  }
+  if (!Number.isFinite(numericLatitude) || numericLatitude < -90 || numericLatitude > 90 ||
+      !Number.isFinite(numericLongitude) || numericLongitude < -180 || numericLongitude > 180) {
+    return res.status(400).json({ message: "Use your current location to place the service on the map." });
+  }
+
+  try {
+    const result = await db.submitCommunityService(req.user.id, {
+      businessName: businessName.trim(),
+      category,
+      description: description.trim(),
+      area: area.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      website: website.trim() || null,
+      latitude: numericLatitude,
+      longitude: numericLongitude,
+    });
+    if (result === "pending_exists") {
+      return res.status(409).json({ message: "You already have a matching service waiting for review." });
+    }
+    res.status(201).json({
+      message: "Your service has been sent for review. It will appear in discovery after approval.",
+      serviceId: result,
+    });
+  } catch (error) {
+    console.error("Submit community service error:", error);
+    res.status(500).json({ message: "Unable to submit your service right now." });
   }
 });
 
@@ -632,6 +1028,55 @@ app.patch(
     } catch (error) {
       console.error("Review merchant application error:", error);
       res.status(500).json({ message: "Unable to review this application." });
+    }
+  }
+);
+
+app.get(
+  "/api/moderation/services",
+  requireDatabase,
+  requireUser,
+  requireModerator,
+  async (req, res) => {
+    try {
+      const services = await db.getPendingCommunityServices();
+      res.json({ services });
+    } catch (error) {
+      console.error("Get community service review queue error:", error);
+      res.status(500).json({ message: "Unable to load community service submissions." });
+    }
+  }
+);
+
+app.patch(
+  "/api/moderation/services/:serviceId",
+  requireDatabase,
+  requireUser,
+  requireModerator,
+  async (req, res) => {
+    const serviceId = Number(req.params.serviceId);
+    const { action } = req.body || {};
+    if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      return res.status(400).json({ message: "Choose a valid service submission." });
+    }
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({ message: "Choose approve or reject." });
+    }
+
+    try {
+      const result = await db.reviewCommunityService(serviceId, req.user.id, action);
+      if (result === "not_found") return res.status(404).json({ message: "Service submission not found." });
+      if (result === "already_reviewed") {
+        return res.status(409).json({ message: "This service submission has already been reviewed." });
+      }
+      res.json({
+        message: result === "approved"
+          ? "Community service approved and added to nearby discovery."
+          : "Community service submission rejected.",
+      });
+    } catch (error) {
+      console.error("Review community service error:", error);
+      res.status(500).json({ message: "Unable to review this service submission." });
     }
   }
 );

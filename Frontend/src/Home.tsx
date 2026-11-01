@@ -180,8 +180,11 @@ function Home() {
               details, get directions, and make your next errand a little easier.
             </p>
             <div className="nearby-feature-actions">
-              <Link to="/map" className="home-primary-link">
-                Explore nearby places <span aria-hidden="true">→</span>
+              <Link to="/services" className="home-primary-link">
+                Explore services &amp; places <span aria-hidden="true">→</span>
+              </Link>
+              <Link to="/map" className="home-local-link">
+                Find nearby stores
               </Link>
               <Link to="/marketplace" className="home-local-link">
                 Browse pre-loved finds

@@ -725,6 +725,182 @@ async function reviewMerchantApplication(applicationId, moderatorId, action) {
   }
 }
 
+async function submitCommunityService(userId, service) {
+  const [pending] = await pool.query(
+    `SELECT id
+     FROM community_services
+     WHERE user_id = ?
+       AND status = 'pending'
+       AND LOWER(TRIM(business_name)) = LOWER(TRIM(?))
+       AND LOWER(TRIM(address)) = LOWER(TRIM(?))
+     LIMIT 1`,
+    [userId, service.businessName, service.address]
+  );
+  if (pending.length) return "pending_exists";
+
+  const [result] = await pool.query(
+    `INSERT INTO community_services
+       (user_id, business_name, category, description, area, address, phone,
+        website, latitude, longitude)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      service.businessName,
+      service.category,
+      service.description,
+      service.area,
+      service.address,
+      service.phone,
+      service.website,
+      service.latitude,
+      service.longitude,
+    ]
+  );
+  return result.insertId;
+}
+
+async function getUserCommunityServices(userId) {
+  const [rows] = await pool.query(
+    `SELECT id, business_name, category, description, area, address, phone,
+            website, latitude, longitude, status, created_at
+     FROM community_services
+     WHERE user_id = ?
+     ORDER BY created_at DESC, id DESC`,
+    [userId]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    businessName: row.business_name,
+    category: row.category,
+    description: row.description,
+    area: row.area,
+    address: row.address,
+    phone: row.phone,
+    website: row.website,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    status: row.status,
+    createdAt: row.created_at,
+  }));
+}
+
+async function getApprovedCommunityServices({ category, latitude, longitude, radiusKm, limit = 50 }) {
+  const categoryFilter = ["appliance_repair", "cleaning", "laundry", "personal_care", "automotive"].includes(category)
+    ? "AND category = ?"
+    : "";
+  const parameters = [latitude, latitude, longitude];
+  if (categoryFilter) parameters.push(category);
+  parameters.push(radiusKm, limit);
+
+  const [rows] = await pool.query(
+    `SELECT id, business_name, category, description, area, address, phone,
+            website, latitude, longitude,
+            (6371 * 2 * ASIN(SQRT(
+              POWER(SIN(RADIANS(latitude - ?) / 2), 2) +
+              COS(RADIANS(?)) * COS(RADIANS(latitude)) *
+              POWER(SIN(RADIANS(longitude - ?) / 2), 2)
+            ))) AS distance_km
+     FROM community_services
+     WHERE status = 'approved'
+       ${categoryFilter}
+     HAVING distance_km <= ?
+     ORDER BY distance_km ASC, business_name ASC
+     LIMIT ?`,
+    parameters
+  );
+
+  return rows.map((row) => ({
+    id: `homex-${row.id}`,
+    source: "HomeX community",
+    name: row.business_name,
+    category: row.category,
+    description: row.description,
+    area: row.area,
+    address: row.address,
+    phone: row.phone,
+    website: row.website,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    distanceKm: Number(row.distance_km),
+  }));
+}
+
+async function getPendingCommunityServices(limit = 100) {
+  const [rows] = await pool.query(
+    `SELECT services.id, services.business_name, services.category,
+            services.description, services.area, services.address,
+            services.phone, services.website, services.latitude,
+            services.longitude, services.created_at,
+            users.username AS submitter_name, users.email AS submitter_email
+     FROM community_services AS services
+     JOIN users ON users.id = services.user_id
+     WHERE services.status = 'pending'
+     ORDER BY services.created_at ASC, services.id ASC
+     LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    businessName: row.business_name,
+    category: row.category,
+    description: row.description,
+    area: row.area,
+    address: row.address,
+    phone: row.phone,
+    website: row.website,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    createdAt: row.created_at,
+    submitterName: row.submitter_name,
+    submitterEmail: row.submitter_email,
+  }));
+}
+
+async function reviewCommunityService(serviceId, moderatorId, action) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [services] = await connection.query(
+      `SELECT status
+       FROM community_services
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [serviceId]
+    );
+    if (!services[0]) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "not_found";
+    }
+    if (services[0].status !== "pending") {
+      await connection.rollback();
+      transactionStarted = false;
+      return "already_reviewed";
+    }
+
+    await connection.query(
+      `UPDATE community_services
+       SET status = ?, moderator_id = ?, reviewed_at = UTC_TIMESTAMP()
+       WHERE id = ? AND status = 'pending'`,
+      [action === "approve" ? "approved" : "rejected", moderatorId, serviceId]
+    );
+    await connection.commit();
+    transactionStarted = false;
+    return action === "approve" ? "approved" : "rejected";
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function importMerchantInventory(userId, storeId, products) {
   const connection = await pool.getConnection();
   let transactionStarted = false;
@@ -1016,5 +1192,10 @@ module.exports = {
   getMerchantDashboard,
   getPendingMerchantApplications,
   reviewMerchantApplication,
+  submitCommunityService,
+  getUserCommunityServices,
+  getApprovedCommunityServices,
+  getPendingCommunityServices,
+  reviewCommunityService,
   importMerchantInventory,
 };

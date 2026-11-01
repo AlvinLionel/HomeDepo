@@ -16,6 +16,7 @@ function Footer() {
               <h2>Explore</h2>
               <Link to="/products">Shop home</Link>
               <Link to="/discover">Discover</Link>
+              <Link to="/services">Services &amp; places</Link>
               <Link to="/map">Find nearby stores</Link>
             </nav>
             <nav className="site-footer-links" aria-label="HomeX community">

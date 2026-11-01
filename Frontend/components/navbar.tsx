@@ -111,6 +111,10 @@ function Navbar({ cartItemCount }: NavbarProps) {
             For stores
           </NavLink>
 
+          <NavLink to="/services" onClick={closeMenus}>
+            Services &amp; places
+          </NavLink>
+
           {isModerator && (
             <NavLink to="/moderation" onClick={closeMenus}>
               Review reports

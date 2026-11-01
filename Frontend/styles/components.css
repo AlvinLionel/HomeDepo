@@ -97,6 +97,26 @@
     display: none;
 }
 
+@media (min-width: 769px) and (max-width: 1120px) {
+    .navbar-content {
+        gap: 0.6rem;
+        padding: 0 0.75rem;
+    }
+
+    .navbar-links {
+        gap: 0.15rem;
+    }
+
+    .navbar-links a {
+        padding: 0.5rem 0.42rem;
+        font-size: 0.79rem;
+    }
+
+    .navbar-actions {
+        gap: 0.6rem;
+    }
+}
+
 @media (max-width: 768px) {
     .navbar-content {
         min-height: 64px;
