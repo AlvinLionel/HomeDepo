@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "../components/footer";
 import "../styles/auth.css";
 
@@ -11,11 +11,16 @@ function Auth() {
     const [success, setSuccess] = useState<string>("");
 
     useEffect(() => {
+        document.body.classList.add("auth-page-body");
+        return () => document.body.classList.remove("auth-page-body");
+    }, []);
+
+    useEffect(() => {
         const paramMode = searchParams.get("mode");
         if (paramMode === "signup" || paramMode === "login") {
             setMode(paramMode);
         }
-    }, [searchParams])
+    }, [searchParams]);
 
     const handleLogin: React.FormEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
@@ -42,6 +47,10 @@ function Auth() {
 
             setSuccess("Login successful");
             localStorage.setItem("homexUsername", data.user.username);
+            localStorage.setItem("homexUserId", String(data.user.id));
+            localStorage.setItem("homexAccountType", data.user.accountType || "buyer");
+            localStorage.setItem("homexIsModerator", String(Boolean(data.user.isModerator)));
+            localStorage.setItem("homexToken", data.token);
             navigate("/Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Login failed");
@@ -66,6 +75,7 @@ function Auth() {
             username: formData.get("username")?.toString() || "",
             email: formData.get("email")?.toString() || "",
             password,
+            accountType: "buyer",
         };
 
         try {
@@ -81,7 +91,11 @@ function Auth() {
             }
 
             setSuccess("Account created successfully");
-            localStorage.setItem("homeXUsername", data.user.username);
+            localStorage.setItem("homexUsername", data.user.username);
+            localStorage.setItem("homexUserId", String(data.user.id));
+            localStorage.setItem("homexAccountType", data.user.accountType || "buyer");
+            localStorage.setItem("homexIsModerator", String(Boolean(data.user.isModerator)));
+            localStorage.setItem("homexToken", data.token);
             navigate("/Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Signup failed");
@@ -89,52 +103,70 @@ function Auth() {
     };
 
     return (
-        <div id="auth">
-            {mode === "login" && (
-                <div id="loginForm">
-                    <h2>Login</h2>
+        <div className="auth-page">
+            <main className="auth-content">
+                <Link className="auth-brand" to="/Home" aria-label="HomeX home">
+                    <span className="auth-brand-mark" aria-hidden="true">⌂</span>
+                    <span>HomeX</span>
+                </Link>
+                {mode === "login" && (
+                    <section className="auth-card" id="loginForm">
+                        <div className="auth-card-intro">
+                            <span className="auth-eyebrow">A little corner of home</span>
+                            <h1>Welcome back.</h1>
+                            <p>Come on in. Your next good find is waiting.</p>
+                        </div>
                     <form id="loginFormElement" onSubmit={handleLogin}>
                         <label htmlFor="loginEmail">Email</label><br />
-                        <input type="email" id="loginEmail" name="email" required /><br />
+                        <input type="email" id="loginEmail" name="email" autoComplete="email" required /><br />
                         <label htmlFor="loginPassword">Password</label><br />
-                        <input type="password" id="loginPassword" name="password" required /><br />
-                        <button type="submit">Login</button>
-                        <a href="#" className="forgotPassword"
+                        <input type="password" id="loginPassword" name="password" autoComplete="current-password" required /><br />
+                        <div className="auth-form-options">
+                        <button type="submit">Come on in <span aria-hidden="true">→</span></button>
+                        <a href="/reset-password" className="forgotPassword"
                             onClick={(e) => {
                                 e.preventDefault();
                                 navigate("/reset-password");
                             }}
-                        >Forgot password</a>
-                    </form><br />
-                    {error && <p style={{ color: "crimson" }}>{error}</p>}
-                    {success && <p style={{ color: "green" }}>{success}</p>}
-                    <p>
-                        Don’t have an account?{" "}
-                        <a href="#" onClick={() => navigate("/Auth?mode=signup")}>Sign Up</a><br />
+                        >Forgot password?</a>
+                        </div>
+                    </form>
+                    {error && <p className="auth-feedback auth-feedback-error" role="alert">{error}</p>}
+                    {success && <p className="auth-feedback auth-feedback-success" role="status">{success}</p>}
+                    <p className="auth-switch">
+                        New around here?{" "}
+                        <button type="button" onClick={() => navigate("/Auth?mode=signup")}>Make yourself at home</button>
                     </p>
-                </div>)}
-            {mode == "signup" && (
-                <div id="signupForm">
-                    <h2>Sign Up</h2>
+                    </section>
+                )}
+                {mode === "signup" && (
+                    <section className="auth-card auth-card-signup" id="signupForm">
+                        <div className="auth-card-intro">
+                            <span className="auth-eyebrow">There’s room for you here</span>
+                            <h1>Let’s make a home.</h1>
+                            <p>Join a community sharing lovely finds and local favorites.</p>
+                        </div>
                     <form id="signupFormElement" onSubmit={handleSignup}>
                         <label htmlFor="signupUsername">Username</label><br />
-                        <input type="text" id="signupUsername" name="username" required /><br />
+                        <input type="text" id="signupUsername" name="username" autoComplete="username" required /><br />
                         <label htmlFor="signupEmail">Email</label><br />
-                        <input type="email" id="signupEmail" name="email" required /><br />
+                        <input type="email" id="signupEmail" name="email" autoComplete="email" required /><br />
                         <label htmlFor="signupPassword">Password</label><br />
-                        <input type="password" id="signupPassword" name="password" required /><br />
+                        <input type="password" id="signupPassword" name="password" minLength={8} autoComplete="new-password" required /><br />
                         <label htmlFor="confirmPassword">Confirm Password</label><br />
-                        <input type="password" id="confirmPassword" name="confirmPassword" required /><br />
-                        <button type="submit">Sign Up</button>
-                    </form><br />
-                    {error && <p style={{ color: "crimson" }}>{error}</p>}
-                    {success && <p style={{ color: "green" }}>{success}</p>}
-                    <p>
-                        Already have an account?{" "}
-                        <a href="#" onClick={() => navigate("/Auth?mode=login")}>Login</a>
+                        <input type="password" id="confirmPassword" name="confirmPassword" autoComplete="new-password" required /><br />
+                        <button type="submit">Create my account <span aria-hidden="true">→</span></button>
+                    </form>
+                    {error && <p className="auth-feedback auth-feedback-error" role="alert">{error}</p>}
+                    {success && <p className="auth-feedback auth-feedback-success" role="status">{success}</p>}
+                    <p className="auth-switch">
+                        Already part of HomeX?{" "}
+                        <button type="button" onClick={() => navigate("/Auth?mode=login")}>Welcome back</button>
                     </p>
-                </div>
-            )}
+                    </section>
+                )}
+                <p className="auth-reassurance"><span aria-hidden="true">✳</span> Good things, shared close to home.</p>
+            </main>
             <Footer />
         </div>
     );
