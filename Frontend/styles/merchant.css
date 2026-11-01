@@ -1,0 +1,318 @@
+body.merchant-page-body {
+  display: block;
+  min-height: 100vh;
+}
+
+body.merchant-page-body #root {
+  width: 100%;
+}
+
+.merchant-page {
+  min-height: 100vh;
+  background: #faf8f4;
+  color: #352b23;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.merchant-page .navbar {
+  padding-top: 1.15rem;
+}
+
+.merchant-page .navbar-content {
+  width: min(1320px, calc(100% - 2rem));
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.merchant-main {
+  width: min(980px, calc(100% - 3rem));
+  min-height: calc(100vh - 150px);
+  margin: 0 auto;
+  padding: clamp(2.2rem, 5vw, 4rem) 0;
+}
+
+.merchant-hero {
+  max-width: 720px;
+  margin-bottom: 2rem;
+}
+
+.merchant-eyebrow {
+  color: #9c6845;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.merchant-hero h1 {
+  margin-top: 0.7rem;
+  color: #34291f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.8rem, 7vw, 4.8rem);
+  font-weight: 500;
+  letter-spacing: -0.07em;
+  line-height: 0.98;
+}
+
+.merchant-hero h1 em {
+  color: #a45b3a;
+  font-weight: 500;
+}
+
+.merchant-hero > p,
+.merchant-application-panel > p,
+.merchant-store-card p {
+  max-width: 680px;
+  margin-top: 0.8rem;
+  color: #75685b;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.merchant-panel {
+  padding: clamp(1.3rem, 4vw, 2rem);
+  border: 1px solid #e8e1d6;
+  border-radius: 20px;
+  background: #fffdfa;
+  box-shadow: 0 12px 30px rgba(73, 52, 33, 0.06);
+}
+
+.merchant-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.merchant-section-heading h2,
+.merchant-application-status h2,
+.merchant-sign-in h2 {
+  margin-top: 0.4rem;
+  color: #3a2d23;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.65rem, 4vw, 2.2rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+}
+
+.merchant-primary-button,
+.merchant-template-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 10px;
+  background: #925334;
+  color: #fffaf4;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.merchant-primary-button:hover:not(:disabled) {
+  background: #75432e;
+}
+
+.merchant-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.merchant-template-button {
+  border: 1px solid #ded5c9;
+  background: white;
+  color: #76503a;
+}
+
+.merchant-csv-guide {
+  margin-bottom: 1.1rem;
+  padding: 0.9rem;
+  border-radius: 11px;
+  background: #f5f2eb;
+  color: #74695d;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.merchant-csv-guide code {
+  color: #684630;
+  font-size: 0.75rem;
+}
+
+.merchant-stores {
+  display: grid;
+  gap: 1rem;
+}
+
+.merchant-store-card h3 {
+  margin-top: 0.35rem;
+  color: #403226;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.merchant-store-card p {
+  margin: 0.4rem 0 1rem;
+}
+
+.merchant-file-field {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+  color: #5d4838;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.merchant-file-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem;
+  border: 1px solid #ded5c9;
+  border-radius: 9px;
+  background: #fff;
+  color: #6d5948;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.merchant-application-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.3rem;
+}
+
+.merchant-application-form label {
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.merchant-application-form label > span {
+  color: #5d4838;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.merchant-application-form input,
+.merchant-application-form textarea {
+  width: 100%;
+  min-height: 45px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #ded5c9;
+  border-radius: 9px;
+  background: #fff;
+  color: #352b23;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.merchant-application-form textarea {
+  resize: vertical;
+}
+
+.merchant-application-form input:focus,
+.merchant-application-form textarea:focus,
+.merchant-file-field input:focus {
+  outline: 2px solid #b87953;
+  outline-offset: 2px;
+}
+
+.merchant-field-wide {
+  grid-column: 1 / -1;
+}
+
+.merchant-application-status {
+  max-width: 680px;
+}
+
+.merchant-status-badge {
+  display: inline-flex;
+  padding: 0.38rem 0.7rem;
+  border-radius: 99px;
+  background: #f5eddb;
+  color: #84643b;
+  font-size: 0.73rem;
+  font-weight: 750;
+}
+
+.merchant-application-status p {
+  margin-top: 0.55rem;
+  color: #75685b;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.merchant-submission-date {
+  font-size: 0.76rem !important;
+}
+
+.merchant-message,
+.merchant-error {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #dfe7d7;
+  border-radius: 11px;
+  background: #f1f5ed;
+  color: #536b43;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.merchant-error {
+  border-color: #e7c8bd;
+  background: #fff6f2;
+  color: #8a4333;
+}
+
+.merchant-sign-in > p {
+  margin: 0.5rem 0 1.1rem;
+  color: #75685b;
+  font-size: 0.87rem;
+  line-height: 1.6;
+}
+
+.merchant-footnote {
+  margin-top: 1.4rem;
+  color: #817467;
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.merchant-footnote a {
+  color: #8d5034;
+  font-weight: 750;
+}
+
+.merchant-page footer {
+  position: static;
+  margin-top: 0;
+}
+
+@media (max-width: 620px) {
+  .merchant-main {
+    width: min(100% - 2rem, 520px);
+    padding-top: 2rem;
+  }
+
+  .merchant-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .merchant-application-form {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-field-wide {
+    grid-column: auto;
+  }
+}
