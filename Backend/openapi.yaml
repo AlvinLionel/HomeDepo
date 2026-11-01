@@ -1,0 +1,760 @@
+openapi: 3.0.3
+info:
+  title: HomeX API
+  version: 1.0.0
+  description: >
+    API for HomeX product discovery, local services, community listings,
+    merchant workspaces, account settings, and support.
+servers:
+  - url: /
+    description: Current HomeX server
+tags:
+  - name: System
+  - name: Authentication
+  - name: Account
+  - name: Products
+  - name: Discovery
+  - name: Places and services
+  - name: Community marketplace
+  - name: Merchants
+  - name: Moderation
+  - name: Support
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Check API and database health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server health and database connection status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  dbReady: { type: boolean }
+                  message: { type: string }
+  /api/openapi.yaml:
+    get:
+      tags: [System]
+      summary: Download the OpenAPI definition
+      operationId: getOpenApiDocument
+      responses:
+        "200":
+          description: OpenAPI 3.0 YAML document.
+          content:
+            application/yaml:
+              schema: { type: string }
+  /api/docs:
+    get:
+      tags: [System]
+      summary: Open the interactive API reference
+      operationId: getInteractiveApiDocs
+      responses:
+        "200":
+          description: Swagger UI HTML documentation page.
+          content:
+            text/html:
+              schema: { type: string }
+  /api/auth/signup:
+    post:
+      tags: [Authentication]
+      summary: Create an account and sign in
+      operationId: signUp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 255 }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in and create a revocable session
+      operationId: logIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current sign-in session
+      operationId: logOut
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/become-seller:
+    post:
+      tags: [Authentication]
+      summary: Enable peer-selling on a regular HomeX account
+      operationId: becomeSeller
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/check-email:
+    post:
+      tags: [Authentication]
+      summary: Check whether an email address can be used
+      operationId: checkEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/auth/request-reset:
+    post:
+      tags: [Authentication]
+      summary: Request a password-reset email
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset a password using a reset token
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/account/settings:
+    get:
+      tags: [Account]
+      summary: Read the current account preferences
+      operationId: getAccountSettings
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [Account]
+      summary: Update profile, preferred area, and phone privacy
+      operationId: updateAccountSettings
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, preferredArea, showContactPhone]
+              properties:
+                username: { type: string, maxLength: 100 }
+                preferredArea: { type: string, maxLength: 100 }
+                showContactPhone: { type: boolean }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/account/password:
+    post:
+      tags: [Account]
+      summary: Change the current password
+      operationId: changeAccountPassword
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/products/department/{departmentSlug}:
+    get:
+      tags: [Products]
+      summary: List available products in a department
+      operationId: getDepartmentProducts
+      parameters:
+        - $ref: "#/components/parameters/DepartmentSlug"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/products/{productId}:
+    get:
+      tags: [Products]
+      summary: Get a product and available store offers
+      operationId: getProduct
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/stores/{storeId}/products:
+    get:
+      tags: [Products]
+      summary: List products available from a store
+      operationId: getStoreProducts
+      parameters:
+        - $ref: "#/components/parameters/StoreId"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/trends/products:
+    get:
+      tags: [Discovery]
+      summary: Find currently available products trending by area
+      operationId: getTrendingProducts
+      parameters:
+        - name: area
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Optional general neighborhood; omit for HomeX-wide trends.
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/trends/events:
+    post:
+      tags: [Discovery]
+      summary: Record an anonymous product search or view
+      operationId: recordProductInterest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, eventType, area, visitorId]
+              properties:
+                productId: { type: integer, minimum: 1 }
+                eventType: { type: string, enum: [search, view] }
+                area: { type: string, maxLength: 100 }
+                visitorId: { type: string, format: uuid }
+      responses:
+        "202": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/stores/search:
+    get:
+      tags: [Places and services]
+      summary: Search OpenStreetMap for local stores
+      operationId: searchStores
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2 }
+        - name: lat
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: lng
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: location
+          in: query
+          schema: { type: string }
+          description: General area used when latitude and longitude are not supplied.
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /api/location/reverse:
+    get:
+      tags: [Places and services]
+      summary: Find a public address for coordinates
+      operationId: reverseGeocode
+      parameters:
+        - $ref: "#/components/parameters/Latitude"
+        - $ref: "#/components/parameters/Longitude"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/places/search:
+    get:
+      tags: [Places and services]
+      summary: Discover nearby services, leisure, and community listings
+      operationId: searchNearbyPlaces
+      description: >
+        Searches OpenStreetMap POI data through Overpass and includes approved
+        HomeX member service listings in home-service categories. Search by
+        coordinates or a general area name. Map coverage and contact details vary.
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [home_services, appliance_repair, cleaning, laundry, personal_care, automotive, leisure, parks, playgrounds, sports, pools, trails, markets]
+            default: home_services
+        - name: lat
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: lng
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: area
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: radiusKm
+          in: query
+          schema: { type: number, minimum: 1, maximum: 25, default: 5 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /api/services/mine:
+    get:
+      tags: [Places and services]
+      summary: List the current member's service submissions
+      operationId: getMyServices
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/services/submissions:
+    post:
+      tags: [Places and services]
+      summary: Suggest a local home service for review
+      operationId: submitCommunityService
+      description: Approved submissions appear in nearby search. Public phone and address are shown to shoppers.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [businessName, category, description, area, address, phone, latitude, longitude]
+              properties:
+                businessName: { type: string, minLength: 2, maxLength: 150 }
+                category: { type: string, enum: [appliance_repair, cleaning, laundry, personal_care, automotive, other] }
+                description: { type: string, minLength: 10, maxLength: 2000 }
+                area: { type: string, minLength: 2, maxLength: 100 }
+                address: { type: string, minLength: 2, maxLength: 255 }
+                phone: { type: string, maxLength: 30 }
+                website: { type: string, format: uri, maxLength: 500 }
+                latitude: { type: number, minimum: -90, maximum: 90 }
+                longitude: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/marketplace/listings:
+    get:
+      tags: [Community marketplace]
+      summary: Browse active peer-to-peer listings
+      operationId: getMarketplaceListings
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: location, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 40 } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Community marketplace]
+      summary: Create a peer-to-peer listing
+      operationId: createMarketplaceListing
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, category, price, condition, neighborhood]
+              properties:
+                title: { type: string, maxLength: 120 }
+                description: { type: string, maxLength: 2000 }
+                category: { type: string }
+                price: { type: number, minimum: 0, exclusiveMinimum: true }
+                condition: { type: string, enum: [like_new, good, well_loved] }
+                neighborhood: { type: string, maxLength: 100 }
+                imageUrl: { type: string, format: uri }
+                contactPhone: { type: string, maxLength: 30 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/marketplace/my-listings:
+    get:
+      tags: [Community marketplace]
+      summary: List the current member's listings
+      operationId: getMyListings
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/marketplace/listings/{listingId}/reports:
+    post:
+      tags: [Community marketplace]
+      summary: Report a peer listing
+      operationId: reportMarketplaceListing
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, enum: [scam, counterfeit, misleading, prohibited, suspicious_contact, other] }
+                details: { type: string, maxLength: 1000 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/marketplace/listings/{listingId}/status:
+    patch:
+      tags: [Community marketplace]
+      summary: Update the current member's listing status
+      operationId: updateMarketplaceListingStatus
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, sold] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/merchant/dashboard:
+    get:
+      tags: [Merchants]
+      summary: Read the current merchant's workspace
+      operationId: getMerchantDashboard
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/merchant/applications:
+    post:
+      tags: [Merchants]
+      summary: Apply for a local store workspace
+      operationId: submitMerchantApplication
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storeName, description, address, phone]
+              properties:
+                storeName: { type: string, maxLength: 150 }
+                description: { type: string, maxLength: 2000 }
+                address: { type: string, maxLength: 255 }
+                phone: { type: string, maxLength: 30 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/merchant/stores/{storeId}/inventory/import:
+    post:
+      tags: [Merchants]
+      summary: Import or update store products from CSV
+      operationId: importMerchantInventory
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/StoreId"
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string, description: "CSV using the template headers described in the README." }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/moderation/listing-reports:
+    get:
+      tags: [Moderation]
+      summary: List pending peer-listing reports
+      operationId: getPendingListingReports
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/moderation/listing-reports/{reportId}:
+    patch:
+      tags: [Moderation]
+      summary: Dismiss a report or remove its listing
+      operationId: reviewListingReport
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [dismiss, remove_listing] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/moderation/merchant-applications:
+    get:
+      tags: [Moderation]
+      summary: List pending merchant applications
+      operationId: getPendingMerchantApplications
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/moderation/merchant-applications/{applicationId}:
+    patch:
+      tags: [Moderation]
+      summary: Approve or reject a merchant application
+      operationId: reviewMerchantApplication
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [approve, reject] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/moderation/services:
+    get:
+      tags: [Moderation]
+      summary: List pending member service submissions
+      operationId: getPendingCommunityServices
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/moderation/services/{serviceId}:
+    patch:
+      tags: [Moderation]
+      summary: Approve or reject a member service submission
+      operationId: reviewCommunityService
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [approve, reject] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/support/contact:
+    get:
+      tags: [Support]
+      summary: Read configured public support channels
+      operationId: getSupportContact
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    post:
+      tags: [Support]
+      summary: Send a categorized customer-support message
+      operationId: sendSupportRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, category, message]
+              properties:
+                name: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 255 }
+                category: { type: string, enum: [order, peer_marketplace, store_account, account_security, other] }
+                orderReference: { type: string, maxLength: 100 }
+                message: { type: string, minLength: 10, maxLength: 5000 }
+                website: { type: string, maxLength: 200, description: "Honeypot field; must be empty." }
+      responses:
+        "202": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Session token returned by the sign-in or sign-up endpoint.
+  parameters:
+    DepartmentSlug:
+      name: departmentSlug
+      in: path
+      required: true
+      schema: { type: string }
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    StoreId:
+      name: storeId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ListingId:
+      name: listingId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ApplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Latitude:
+      name: lat
+      in: query
+      required: true
+      schema: { type: number, minimum: -90, maximum: 90 }
+    Longitude:
+      name: lng
+      in: query
+      required: true
+      schema: { type: number, minimum: -180, maximum: 180 }
+  responses:
+    Success:
+      description: Request succeeded.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    BadRequest:
+      description: Input is invalid.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    Unauthorized:
+      description: Sign-in is required or the session has expired.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    Forbidden:
+      description: The signed-in account does not have moderator access.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    NotFound:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    Conflict:
+      description: The request conflicts with an existing resource.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    RateLimited:
+      description: Too many requests; wait before trying again.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    Unavailable:
+      description: A required service is not configured or available.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+    UpstreamError:
+      description: An upstream email or map-data provider could not complete the request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Message" }
+  schemas:
+    Message:
+      type: object
+      properties:
+        message: { type: string }

@@ -36,11 +36,10 @@
 
 \# Now that I'm accessing the user's location, track it and therefore use it to find the most searched locations and work on improving that area's searches
 
-\# Add services just like products, fridge repair, tv repair, cleaning, catering etc
+\# Nearby home services: OpenStreetMap discovery now covers mapped repair, cleaning, laundry, personal care, and auto services. Members can suggest other home services for moderator review; additional provider categories such as catering remain future work.
 
 \# Usernames can be identical since it's what is displayed on the screen and not how they're identified in the system
 
 \# Existing emails cannot create another account
 
-\# Events and local services: Expand into family events and home services once discovery, submissions, and review workflows are ready.
-
+\# Events and local services: Home-service submissions now go through review, and nearby discovery includes mapped parks, trails, playgrounds, sports areas, pools, and markets. Family events and event submissions remain future work.
