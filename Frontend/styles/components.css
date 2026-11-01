@@ -142,6 +142,26 @@
 
     .cart-link span:nth-child(2),
     .profile-button {
+        display: grid;
+    }
+
+    .profile-menu {
+        position: static;
+    }
+
+    .profile-dropdown {
+        position: absolute;
+        top: calc(100% + 0.6rem);
+        right: 0.75rem;
+        width: min(320px, calc(100vw - 1.5rem));
+        z-index: 110;
+    }
+
+    .navbar-content {
+        position: relative;
+    }
+
+    .cart-link span:nth-child(2) {
         display: none;
     }
 }
@@ -155,6 +175,12 @@
     height: 40px;
     display: grid;
     place-items: center;
+    border: 1px solid rgba(147, 104, 67, 0.22);
+    background: #fffaf3;
+    color: #8d5034;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 750;
     border-radius: 50%;
     transition: background-color 180ms ease, transform 180ms ease;
 }
@@ -168,12 +194,47 @@
     position: absolute;
     top: calc(100% + 0.65rem);
     right: 0;
-    min-width: 140px;
-    padding: 0.45rem;
+    min-width: 230px;
+    padding: 0.5rem;
     background: white;
     border: 1px solid rgba(119, 77, 42, 0.14);
     border-radius: 12px;
     box-shadow: 0 12px 28px rgba(97, 52, 18, 0.14);
+}
+
+.profile-dropdown-identity {
+    display: grid;
+    gap: 0.2rem;
+    margin-bottom: 0.35rem;
+    padding: 0.65rem 0.7rem 0.8rem;
+    border-bottom: 1px solid #eee7de;
+}
+
+.profile-dropdown-identity strong {
+    color: #49382b;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1rem;
+}
+
+.profile-dropdown-identity span {
+    color: #897b6d;
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
+.profile-dropdown a {
+    display: block;
+    padding: 0.65rem 0.7rem;
+    border-radius: 8px;
+    color: #6d5948;
+    font-size: 0.78rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.profile-dropdown a:hover {
+    background: #f7f2eb;
+    color: #8d5034;
 }
 
 .logout-button,
@@ -203,15 +264,14 @@
     .mobile-logout-button {
         display: block;
     }
+
+    .mobile-logout-button[hidden] {
+        display: none;
+    }
 }
 
 /* Footer */
 footer {
-    background-color: var(--chocolate);
-    position: fixed;
-    bottom: 0;
-    left: 0;
+    position: static;
     width: 100%;
-    text-align: center;
-    color: var(--color);
 }

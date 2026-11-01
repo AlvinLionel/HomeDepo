@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import Footer from "../components/footer";
 import Navbar from "../components/navbar";
 import appliancesImage from "../assets/categories/appliances.webp";
@@ -13,6 +13,7 @@ import outdoorImage from "../assets/categories/outdoor.webp";
 import petsImage from "../assets/categories/pets.webp";
 import seasonalImage from "../assets/categories/seasonal.webp";
 import textilesImage from "../assets/categories/textiles.webp";
+import { getTrendArea, trackProductTrend } from "./trends";
 import "../styles/products.css";
 
 type DepartmentGroup = "indoor" | "kitchen" | "outdoor" | "lifestyle" | "seasonal";
@@ -138,7 +139,8 @@ const filters: { label: string; value: DepartmentGroup | "all" }[] = [
 
 function Products() {
     const { categorySlug } = useParams<{ categorySlug: string }>();
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchParams] = useSearchParams();
+    const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
     const [activeFilter, setActiveFilter] = useState<DepartmentGroup | "all">("all");
     const [products, setProducts] = useState<Product[]>([]);
     const [productsLoading, setProductsLoading] = useState(false);
@@ -148,6 +150,9 @@ function Products() {
         document.body.classList.add("products-page-body");
         return () => document.body.classList.remove("products-page-body");
     }, []);
+    useEffect(() => {
+        setSearchQuery(searchParams.get("q") || "");
+    }, [searchParams]);
     useEffect(() => {
         if (!categorySlug) {
             setProducts([]);
@@ -160,7 +165,7 @@ function Products() {
                 setProductsLoading(true);
                 setProductsError("");
 
-                const response = await fetch(`http://localhost:5000/api/products/department/${categorySlug}`);
+                const response = await fetch(`/api/products/department/${categorySlug}`);
 
                 if (!response.ok) throw new Error("Failed to load products");
 
@@ -189,6 +194,34 @@ function Products() {
             return matchesFilter && (!normalizedQuery || searchableText.includes(normalizedQuery));
         });
     }, [activeFilter, searchQuery]);
+    const visibleProducts = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+
+        if (!normalizedQuery) return products;
+
+        return products.filter((product) =>
+            `${product.name} ${product.description} ${product.brand}`
+                .toLocaleLowerCase()
+                .includes(normalizedQuery),
+        );
+    }, [products, searchQuery]);
+
+    useEffect(() => {
+        const query = searchQuery.trim();
+        if (!categorySlug || !query || visibleProducts.length === 0) return;
+
+        const timeout = window.setTimeout(() => {
+            Promise.all(
+                visibleProducts.slice(0, 20).map((product) =>
+                    trackProductTrend(product.id, "search"),
+                ),
+            ).catch((error: unknown) => {
+                console.error("Unable to record product search trends:", error);
+            });
+        }, 700);
+
+        return () => window.clearTimeout(timeout);
+    }, [categorySlug, searchQuery, visibleProducts]);
 
     if (categorySlug) {
         return (
@@ -217,11 +250,36 @@ function Products() {
                                 <p className="department-product-count" aria-live="polite">
                                     {productsLoading
                                         ? "Loading products..."
-                                        : `${products.length} ${products.length === 1 ? "product" : "products"
+                                        : `${visibleProducts.length} ${visibleProducts.length === 1 ? "product" : "products"
                                         }`
                                     }
                                 </p>
                             </div>
+
+                            <label className="department-search department-catalogue-search">
+                                <span className="visually-hidden">Search products in {selectedDepartment.name}</span>
+                                <input
+                                    type="search"
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    placeholder={`Search ${selectedDepartment.name.toLocaleLowerCase()}...`}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        className="department-search-clear"
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        aria-label="Clear product search"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </label>
+
+                            <p className="department-trend-disclosure">
+                                Product searches may contribute to anonymous HomeX trend counts.{" "}
+                                <Link to="/discover">Learn more</Link>.
+                            </p>
 
                             {productsLoading ? (
                                 <div className="department-loading">
@@ -232,9 +290,9 @@ function Products() {
                                     <h2>Something went wrong</h2>
                                     <p>{productsError}</p>
                                 </div>
-                            ) : products.length > 0 ? (
+                            ) : visibleProducts.length > 0 ? (
                                 <div className="product-grid">
-                                    {products.map((product) => (
+                                    {visibleProducts.map((product) => (
                                         <Link className="product-card" key={product.id} to={`/product/${product.id}`}>
                                             <div className="product-card-image">
                                                 <img
@@ -269,8 +327,12 @@ function Products() {
                                 </div>
                             ) : (
                                 <div className="department-empty-state">
-                                    <h2>No products available</h2>
-                                    <p>There are currently no available products in this department.</p>
+                                    <h2>{searchQuery ? "No matching products" : "No products available"}</h2>
+                                    <p>
+                                        {searchQuery
+                                            ? `We couldn't find “${searchQuery}” in this department. Try another search.`
+                                            : "There are currently no available products in this department."}
+                                    </p>
                                 </div>
                             )}
                         </section>
@@ -340,6 +402,11 @@ function Products() {
                     </div>
                 </section>
 
+                <p className="products-trend-disclosure">
+                    Product searches and views may contribute to anonymous HomeX trend counts. Learn more on{" "}
+                    <Link to="/discover">Discover</Link>.
+                </p>
+
                 <section className="department-list" aria-labelledby="department-list-title">
                     <div className="department-list-heading">
                         <div>
@@ -358,7 +425,7 @@ function Products() {
                                 <Link
                                     className="department-card"
                                     key={department.slug}
-                                    to={`/products/${department.slug}`}
+                                    to={`/products/${department.slug}${searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ""}`}
                                 >
                                     <div className="department-card-image">
                                         <img src={department.image} alt="" loading="lazy" />

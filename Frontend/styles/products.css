@@ -60,6 +60,31 @@ body.products-page-body #root {
   margin: 0 auto 3.75rem;
 }
 
+.products-trend-disclosure {
+  margin: -2.6rem 0 3rem;
+  color: #84796e;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.products-trend-disclosure a {
+  color: #8d5034;
+  font-weight: 700;
+}
+
+.department-trend-disclosure {
+  margin: -1.5rem 0 1.5rem;
+  color: #84796e;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.department-trend-disclosure a {
+  color: #8d5034;
+  font-weight: 700;
+}
+
 .department-search {
   width: min(100%, 680px);
   min-height: 60px;
@@ -190,6 +215,10 @@ body.products-page-body #root {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 12px 32px rgba(80, 49, 28, 0.07);
+}
+
+.department-catalogue-search {
+  margin: 0 0 1.4rem;
 }
 
 .department-catalogue-intro {

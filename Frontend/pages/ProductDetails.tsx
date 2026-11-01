@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/navbar";
 import Footer from "../components/footer";
+import furnitureImage from "../assets/categories/furniture.webp";
+import { addCartItem } from "../src/cartStore";
+import { trackProductTrend } from "../src/trends";
 import "../styles/productDetails.css";
 
 interface StoreListing {
@@ -10,7 +13,7 @@ interface StoreListing {
     address: string;
     phone: string;
     email: string;
-    imageUrl: string;
+    imageUrl: string | null;
     price: number;
     stockQuantity: number;
     isAvailable: boolean;
@@ -22,6 +25,7 @@ interface Product {
     description: string;
     brand: string;
     unit: string;
+    imageUrl: string | null;
     stores: StoreListing[];
 }
 
@@ -30,6 +34,33 @@ function ProductDetails() {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [cartMessage, setCartMessage] = useState("");
+    const [cartError, setCartError] = useState("");
+
+    const handleAddToCart = (store: StoreListing) => {
+        if (!product) return;
+        setCartMessage("");
+        setCartError("");
+        try {
+            addCartItem({
+                productId: product.id,
+                storeId: store.id,
+                name: product.name,
+                brand: product.brand,
+                storeName: store.name,
+                price: store.price,
+                imageUrl: store.imageUrl || product.imageUrl || furnitureImage,
+                stockQuantity: store.stockQuantity,
+            });
+            setCartMessage(`${product.name} is in your basket.`);
+        } catch (addError) {
+            setCartError(
+                addError instanceof Error
+                    ? addError.message
+                    : "Unable to save this item to your basket.",
+            );
+        }
+    };
 
     useEffect(() => {
         if (!productId) {
@@ -43,7 +74,7 @@ function ProductDetails() {
                 setLoading(true);
                 setError("");
 
-                const response = await fetch(`http://localhost:5000/api/products/${productId}`);
+                const response = await fetch(`/api/products/${productId}`);
 
                 if (!response.ok) throw new Error("Failed to load product");
 
@@ -65,6 +96,14 @@ function ProductDetails() {
 
         return () => { document.body.classList.remove("product-details-page-body"); };
     }, []);
+
+    useEffect(() => {
+        if (!product) return;
+
+        trackProductTrend(product.id, "view").catch((trendError: unknown) => {
+            console.error("Unable to record product view trend:", trendError);
+        });
+    }, [product?.id]);
 
     if (loading) {
         return (
@@ -109,6 +148,10 @@ function ProductDetails() {
                         <span>{product.brand}</span>
                         <h1>{product.name}</h1>
                         <p>{product.description}</p>
+                        <p className="product-trend-disclosure">
+                            This product view may contribute to anonymous HomeX trend counts.{" "}
+                            <Link to="/discover">Learn about trends</Link>.
+                        </p>
 
                         <div className="product-store-heading">
                             <strong>
@@ -116,12 +159,21 @@ function ProductDetails() {
                                 {product.stores.length === 1 ? "store" : "stores"}
                             </strong>
                         </div>
+                        {cartMessage && <p className="cart-feedback" role="status">{cartMessage}</p>}
+                        {cartError && <p className="cart-feedback cart-feedback-error" role="alert">{cartError}</p>}
 
                         <div className="product-store-list">
                             {product.stores.map((store) => (
                                 <article className="product-store" key={store.id}>
                                     <div className="product-store-image">
-                                        <img src={store.imageUrl} alt={`${product.name} from ${store.name}`} />
+                                        <img
+                                            src={store.imageUrl || product.imageUrl || furnitureImage}
+                                            alt={`${product.name} from ${store.name}`}
+                                            onError={(event) => {
+                                                event.currentTarget.onerror = null;
+                                                event.currentTarget.src = furnitureImage;
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="product-store-info">
@@ -134,6 +186,16 @@ function ProductDetails() {
                                                 {store.isAvailable && store.stockQuantity > 0 ? `${store.stockQuantity} in stock` : "Out of stock"}
                                             </span>
                                         </div>
+                                        <button
+                                            className="add-to-cart-button"
+                                            type="button"
+                                            disabled={!store.isAvailable || store.stockQuantity <= 0}
+                                            onClick={() => handleAddToCart(store)}
+                                        >
+                                            {store.isAvailable && store.stockQuantity > 0
+                                                ? "Add to basket"
+                                                : "Currently unavailable"}
+                                        </button>
                                     </div>
                                 </article>
                             ))}
