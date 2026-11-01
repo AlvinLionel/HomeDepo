@@ -110,7 +110,7 @@ function ProductDetails() {
             <div className="product-details-page">
                 <Navbar />
                 <main className="product-details-main">
-                    <p>Loading product...</p>
+                    <p className="product-details-loading" role="status">Finding the details…</p>
                 </main>
                 <Footer />
             </div>
@@ -122,12 +122,15 @@ function ProductDetails() {
             <div className="product-details-page">
                 <Navbar />
                 <main className="product-details-main">
-                    <Link to="/products">← Back to products</Link>
+                    <Link className="product-details-back" to="/products">
+                        <span aria-hidden="true">←</span> All departments
+                    </Link>
 
                     <section className="product-details-error">
+                        <span className="product-details-eyebrow">A little detour</span>
                         <h1>Product not found</h1>
                         <p>{error || "We couldn't find that product."}</p>
-                        <Link to="/products">Browse departments</Link>
+                        <Link className="product-details-browse" to="/products">Browse departments <span aria-hidden="true">→</span></Link>
                     </section>
                 </main>
                 <Footer />
@@ -140,67 +143,94 @@ function ProductDetails() {
             <Navbar />
             <main className="product-details-main">
                 <Link className="product-details-back" to="/products">
-                    ← Back to products
+                    <span aria-hidden="true">←</span> All departments
                 </Link>
 
                 <section className="product-details">
-                    <div className="product-details-info">
-                        <span>{product.brand}</span>
-                        <h1>{product.name}</h1>
-                        <p>{product.description}</p>
-                        <p className="product-trend-disclosure">
-                            This product view may contribute to anonymous HomeX trend counts.{" "}
-                            <Link to="/discover">Learn about trends</Link>.
-                        </p>
+                    <header className="product-details-hero">
+                        <div className="product-details-hero-image">
+                            <img
+                                src={product.imageUrl || furnitureImage}
+                                alt={product.name}
+                                onError={(event) => {
+                                    event.currentTarget.onerror = null;
+                                    event.currentTarget.src = furnitureImage;
+                                }}
+                            />
+                            <span className="product-details-image-note">A good find for your home</span>
+                        </div>
+                        <div className="product-details-info">
+                            <span className="product-details-eyebrow">{product.brand || "Thoughtful home finds"}</span>
+                            <h1>{product.name}</h1>
+                            <p>{product.description || "A lovely addition to your home, available from local HomeX stores."}</p>
+                            <div className="product-details-summary">
+                                <span><strong>{product.stores.length}</strong> {product.stores.length === 1 ? "local store" : "local stores"}</span>
+                                <span>Compare nearby availability</span>
+                            </div>
+                            <p className="product-trend-disclosure">
+                                This product view may contribute to anonymous HomeX trend counts.{" "}
+                                <Link to="/discover">Learn about trends</Link>.
+                            </p>
+                        </div>
+                    </header>
 
+                    <section className="product-offers" aria-labelledby="product-offers-title">
                         <div className="product-store-heading">
-                            <strong>
-                                Available from {product.stores.length}{" "}
-                                {product.stores.length === 1 ? "store" : "stores"}
-                            </strong>
+                            <div>
+                                <span className="product-details-eyebrow">Shop close to home</span>
+                                <h2 id="product-offers-title">Find it at a nearby store</h2>
+                            </div>
+                            <strong>{product.stores.length} {product.stores.length === 1 ? "offer" : "offers"}</strong>
                         </div>
                         {cartMessage && <p className="cart-feedback" role="status">{cartMessage}</p>}
                         {cartError && <p className="cart-feedback cart-feedback-error" role="alert">{cartError}</p>}
 
-                        <div className="product-store-list">
-                            {product.stores.map((store) => (
-                                <article className="product-store" key={store.id}>
-                                    <div className="product-store-image">
-                                        <img
-                                            src={store.imageUrl || product.imageUrl || furnitureImage}
-                                            alt={`${product.name} from ${store.name}`}
-                                            onError={(event) => {
-                                                event.currentTarget.onerror = null;
-                                                event.currentTarget.src = furnitureImage;
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div className="product-store-info">
-                                        <h2>{store.name}</h2>
-                                        <p>{store.address}</p>
-
-                                        <div className="product-store-purchase">
-                                            <strong> KSh {store.price.toLocaleString()}</strong>
-                                            <span>
-                                                {store.isAvailable && store.stockQuantity > 0 ? `${store.stockQuantity} in stock` : "Out of stock"}
-                                            </span>
+                        {product.stores.length > 0 ? (
+                            <div className="product-store-list">
+                                {product.stores.map((store) => (
+                                    <article className="product-store" key={store.id}>
+                                        <div className="product-store-image">
+                                            <img
+                                                src={store.imageUrl || product.imageUrl || furnitureImage}
+                                                alt={`${product.name} at ${store.name}`}
+                                                onError={(event) => {
+                                                    event.currentTarget.onerror = null;
+                                                    event.currentTarget.src = furnitureImage;
+                                                }}
+                                            />
                                         </div>
-                                        <button
-                                            className="add-to-cart-button"
-                                            type="button"
-                                            disabled={!store.isAvailable || store.stockQuantity <= 0}
-                                            onClick={() => handleAddToCart(store)}
-                                        >
-                                            {store.isAvailable && store.stockQuantity > 0
-                                                ? "Add to basket"
-                                                : "Currently unavailable"}
-                                        </button>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    </div>
+                                        <div className="product-store-info">
+                                            <span className="product-store-label">Local store</span>
+                                            <h3>{store.name}</h3>
+                                            <p>{store.address}</p>
+                                            <div className="product-store-purchase">
+                                                <strong>KSh {store.price.toLocaleString()}</strong>
+                                                <span className={store.isAvailable && store.stockQuantity > 0 ? "stock-available" : "stock-unavailable"}>
+                                                    {store.isAvailable && store.stockQuantity > 0 ? `${store.stockQuantity} in stock` : "Out of stock"}
+                                                </span>
+                                            </div>
+                                            <button
+                                                className="add-to-cart-button"
+                                                type="button"
+                                                disabled={!store.isAvailable || store.stockQuantity <= 0}
+                                                onClick={() => handleAddToCart(store)}
+                                            >
+                                                {store.isAvailable && store.stockQuantity > 0
+                                                    ? "Add to basket"
+                                                    : "Currently unavailable"}
+                                            </button>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="product-offers-empty">
+                                <h3>No store offers just yet.</h3>
+                                <p>Try browsing another department or check back as local stores update their catalogs.</p>
+                                <Link className="product-details-browse" to="/products">Explore departments <span aria-hidden="true">→</span></Link>
+                            </div>
+                        )}
+                    </section>
                 </section>
             </main>
             <Footer />

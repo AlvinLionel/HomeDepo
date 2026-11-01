@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import { divIcon } from "leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import Footer from "../components/footer";
 import Navbar from "../components/navbar";
+import "leaflet/dist/leaflet.css";
 import "../styles/map.css";
 
 interface Store {
@@ -25,23 +28,38 @@ interface UserLocation {
     lng: number;
 }
 
-const getMapEmbedUrl = (latitude: number, longitude: number) => {
-    const mapPadding = 0.01;
+const storeMapIcon = divIcon({
+    className: "map-store-marker-icon",
+    html: '<span class="map-store-marker"></span>',
+    iconSize: [30, 38],
+    iconAnchor: [15, 36],
+    popupAnchor: [0, -32],
+});
 
-    const bbox = [
-        longitude - mapPadding,
-        latitude - mapPadding,
-        longitude + mapPadding,
-        latitude + mapPadding,
-    ].join(",");
-    const params = new URLSearchParams({
-        bbox,
-        layer: "mapnik",
-        marker: `${latitude},${longitude}`,
-    });
+const userMapIcon = divIcon({
+    className: "map-user-marker-icon",
+    html: '<span class="map-user-marker"><span></span></span>',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+});
 
-    return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
-};
+function MapViewport({ selectedStore, userLocation }: {
+    selectedStore: Store | null;
+    userLocation: UserLocation | null;
+}) {
+    const map = useMap();
+
+    useEffect(() => {
+        const target = selectedStore
+            ? [selectedStore.latitude, selectedStore.longitude] as [number, number]
+            : userLocation
+                ? [userLocation.lat, userLocation.lng] as [number, number]
+                : null;
+        if (target) map.setView(target, Math.max(map.getZoom(), 14), { animate: true });
+    }, [map, selectedStore?.id, userLocation?.lat, userLocation?.lng]);
+
+    return null;
+}
 
 const getWebsiteUrl = (website: string | null) => {
     if (!website) return null;
@@ -121,10 +139,10 @@ function Map() {
         return badges;
     };
 
-    const handleDirections = (e: React.MouseEvent, address: string) => {
+    const handleDirections = (e: React.MouseEvent, store: Store) => {
         e.stopPropagation();
         window.open(
-            `https://www.google.com/maps/search/${encodeURIComponent(address)}`, "_blank"
+            `https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`, "_blank"
         );
     };
 
@@ -218,6 +236,7 @@ function Map() {
             <div className="map-header">
                 <div className="map-header-content">
                     <h1>Find Stores & Services</h1>
+                    <p className="map-header-note">Select a result or map pin to see where it is. Place names, hours, and contact details depend on OpenStreetMap coverage.</p>
                     <form className="search-wrapper" onSubmit={handleStoreSearch}>
                         <input type="text" className="search-input" placeholder="Search by store name, address, or type..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                         <button type="submit" className="search-submit" disabled={isSearching}>
@@ -255,11 +274,18 @@ function Map() {
                     <div className="stores-list">
                         {displayedStores.length > 0 ? (
                             displayedStores.map((store) => (
-                                <div key={store.id} className={`store-card ${selectedStore?.id === store.id ? "active" : ""} `} onClick={() => setSelectedStore(store)}>
+                                <div key={store.id} className={`store-card ${selectedStore?.id === store.id ? "active" : ""}`}>
                                     <div className="store-header">
                                         <div className="store-title-section">
-                                            <h3>{store.name}</h3>
-                                            <span className="store-type">{store.type}</span>
+                                            <button
+                                                type="button"
+                                                className="store-select-button"
+                                                aria-pressed={selectedStore?.id === store.id}
+                                                onClick={() => setSelectedStore(store)}
+                                            >
+                                                <h3>{store.name}</h3>
+                                                <span className="store-type">{store.type}</span>
+                                            </button>
                                         </div>
                                         <div className="store-badges">
                                             {getBadges(store).map((badge) => (
@@ -300,7 +326,7 @@ function Map() {
                                             </a>
                                         )}
 
-                                        <button className="action-btn directions-btn" onClick={(event) => handleDirections(event, store.address)} title="Get directions">
+                                        <button className="action-btn directions-btn" onClick={(event) => handleDirections(event, store)} title="Get directions">
                                             🗺️
                                         </button>
 
@@ -341,26 +367,65 @@ function Map() {
 
                 <section className="map-panel" ref={mapPanelRef}>
                     <div className="map-wrapper">
-                        {selectedStore && (
+                        {(selectedStore || userLocation) ? (
                             <>
                                 <div className="selected-store-info">
-                                    <h3>{selectedStore.name}</h3>
-                                    <p>{selectedStore.address}</p>
+                                    <div>
+                                        <span className="map-selected-eyebrow">
+                                            {selectedStore ? "Selected nearby place" : "Your location"}
+                                        </span>
+                                        <h3>{selectedStore?.name || "You are here"}</h3>
+                                        <p>{selectedStore?.address || "Nearby search center"}</p>
+                                    </div>
+                                    {displayedStores.length > 1 && (
+                                        <span className="map-pin-count">{displayedStores.length} map pins</span>
+                                    )}
                                 </div>
-                                <iframe
-                                    className="map-iframe"
-                                    src={getMapEmbedUrl(selectedStore.latitude, selectedStore.longitude)}
-                                    width="100%"
-                                    height="100%"
-                                    style={{ border: 0 }}
-                                    allowFullScreen
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                ></iframe>
-                                <p className="map-attribution">
-                                    ©{" "} <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer"> OpenStreetMap contributors</a>
-                                </p>
+                                <div className="map-canvas">
+                                    <MapContainer
+                                        center={selectedStore
+                                            ? [selectedStore.latitude, selectedStore.longitude]
+                                            : [userLocation!.lat, userLocation!.lng]}
+                                        zoom={14}
+                                        scrollWheelZoom={false}
+                                        className="map-leaflet"
+                                    >
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                        <MapViewport selectedStore={selectedStore} userLocation={userLocation} />
+                                        {displayedStores.map((store) => (
+                                            <Marker
+                                                key={store.id}
+                                                position={[store.latitude, store.longitude]}
+                                                icon={storeMapIcon}
+                                                eventHandlers={{ click: () => setSelectedStore(store) }}
+                                            >
+                                                <Popup>
+                                                    <strong>{store.name}</strong><br />
+                                                    <span>{store.address}</span>
+                                                </Popup>
+                                            </Marker>
+                                        ))}
+                                        {userLocation && (
+                                            <Marker position={[userLocation.lat, userLocation.lng]} icon={userMapIcon} zIndexOffset={1000}>
+                                                <Popup>Your current search location</Popup>
+                                            </Marker>
+                                        )}
+                                    </MapContainer>
+                                </div>
                             </>
+                        ) : hasSearched ? (
+                            <div className="map-empty">
+                                <span aria-hidden="true">⌖</span>
+                                <p>A map pin will appear when a place is selected.</p>
+                            </div>
+                        ) : (
+                            <div className="map-empty">
+                                <span aria-hidden="true">⌖</span>
+                                <p>Search for a place to see its map and nearby pins.</p>
+                            </div>
                         )}
                     </div>
                 </section>

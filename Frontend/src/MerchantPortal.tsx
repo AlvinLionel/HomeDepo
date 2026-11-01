@@ -45,10 +45,12 @@ function MerchantPortal() {
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
   const [isLoading, setIsLoading] = useState(Boolean(token));
   const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [uploadingStoreId, setUploadingStoreId] = useState<number | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<number, File | undefined>>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
 
   useEffect(() => {
     document.body.classList.add("merchant-page-body");
@@ -145,6 +147,49 @@ function MerchantPortal() {
     URL.revokeObjectURL(fileUrl);
   };
 
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage("Your browser does not support location services.");
+      return;
+    }
+
+    setIsGettingLocation(true);
+    setLocationMessage("");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const params = new URLSearchParams({
+            lat: String(position.coords.latitude),
+            lng: String(position.coords.longitude),
+          });
+          const response = await fetch(`/api/location/reverse?${params.toString()}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Unable to look up your store address.");
+          setApplicationForm((current) => ({ ...current, address: data.address }));
+          setLocationMessage("Your current address was added. Please check it before submitting.");
+        } catch (locationError) {
+          setLocationMessage(
+            locationError instanceof Error
+              ? locationError.message
+              : "Unable to look up your store address.",
+          );
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (locationError) => {
+        const messages: Record<number, string> = {
+          1: "Location permission was denied. Enter your store address manually.",
+          2: "Your location could not be determined right now.",
+          3: "Location request timed out. Please try again.",
+        };
+        setLocationMessage(messages[locationError.code] || "Unable to get your current location.");
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    );
+  };
+
   return (
     <div className="merchant-page">
       <Navbar />
@@ -235,6 +280,13 @@ function MerchantPortal() {
                 <span>Public store address</span>
                 <input required maxLength={255} value={applicationForm.address} onChange={(event) => setApplicationForm({ ...applicationForm, address: event.target.value })} />
               </label>
+              <div className="merchant-location-control">
+                <button type="button" className="merchant-location-button" onClick={useCurrentLocation} disabled={isGettingLocation}>
+                  {isGettingLocation ? "Finding your location…" : "Use my current location"}
+                </button>
+                <span>We’ll look up a nearby public address for you to review.</span>
+                {locationMessage && <p role="status">{locationMessage}</p>}
+              </div>
               <label>
                 <span>Store phone</span>
                 <input required type="tel" maxLength={30} value={applicationForm.phone} onChange={(event) => setApplicationForm({ ...applicationForm, phone: event.target.value })} />

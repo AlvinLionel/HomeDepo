@@ -226,6 +226,51 @@ body.merchant-page-body #root {
   outline-offset: 2px;
 }
 
+.merchant-location-control {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 0.4rem;
+}
+
+.merchant-location-button {
+  min-height: 42px;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #b87953;
+  border-radius: 9px;
+  background: #fffaf5;
+  color: #825037;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.merchant-location-button:hover:not(:disabled) {
+  background: #f2e7dc;
+}
+
+.merchant-location-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.merchant-location-button:focus-visible {
+  outline: 2px solid #b87953;
+  outline-offset: 2px;
+}
+
+.merchant-location-control > span,
+.merchant-location-control > p {
+  color: #75685b;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.merchant-location-control > p[role="status"] {
+  color: #557548;
+}
+
 .merchant-field-wide {
   grid-column: 1 / -1;
 }
