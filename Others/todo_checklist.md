@@ -1,12 +1,8 @@
-\#User opens the site and first page they see is the login in set-up page, "Home Depo, turn your house into a home".
-
 \#For first time sign-ups, the user is asked to choose an account type: 'client, seller', the accounts have no difference except that for the seller account they get a side dashboard where they can view their store's trend, how many searches, views and any purchases made or pending orders or enquires from potential customers.
 
 \#After login, the page fades and the user is directed to another page containing an overview of the services offered, they can go directly to the map, they can view the services available in the platform, they can view the frequently searched or viewed products in their area or locally and they can view stores within their area that have discounts or offers.
 
 \#Users will have the option to also resell some of their products and view the products being resold in their area and the necessary contacts. Find a way to prevent cons and a feature to allow people to report fraud or con accounts.
-
-\#It will include categories such as furniture, appliances, cultery, trees, interior and exterior deco, gym, gadgets.
 
 \#If possible add a functionality to allow users to add a service thats offered within their location but not currently displayed on the platform, they will be reviewed before adding.
 
@@ -18,23 +14,11 @@
 
 \#Markets and other grocery joints
 
-\#Add a return to home option
-
 \#Add a sidemenu to make it easier to navigate from one service to another
 
 \#Add a feature to check if the store allows direct communication and if so allow the user to communicate with them
 
-\#Make the call and website buttons real
-
-\#Use store.phone for a tel: link and store.website for an external link. Hide or disable them when OpenStreetMap has no value.
-
-\#Replace the single embed with an interactive Leaflet map
-
 \#Show all returned stores as pins, plus the user’s location, and select cards/pins both ways. This is the biggest UX upgrade.
-
-\#Add a location fallback
-
-\#If a user denies GPS permission, let them enter a city/area so searches are still local.
 
 \#Add filters, for example: store type, has website, and opening-hours information. “Open now” should wait until you have a reliable way to interpret the opening\_hours data.
 
@@ -53,3 +37,10 @@
 \# Now that I'm accessing the user's location, track it and therefore use it to find the most searched locations and work on improving that area's searches
 
 \# Add services just like products, fridge repair, tv repair, cleaning, catering etc
+
+\# Usernames can be identical since it's what is displayed on the screen and not how they're identified in the system
+
+\# Existing emails cannot create another account
+
+\# Events and local services: Expand into family events and home services once discovery, submissions, and review workflows are ready.
+
