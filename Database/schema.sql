@@ -12,6 +12,16 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INT PRIMARY KEY,
+  preferred_area VARCHAR(100) NULL,
+  show_contact_phone BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_settings_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS reset_tokens (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -65,6 +75,52 @@ CREATE TABLE IF NOT EXISTS store_products (
 
     INDEX idx_store_products_store (store_id),
     INDEX idx_store_products_product (product_id)
+);
+
+CREATE TABLE IF NOT EXISTS merchant_applications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL,
+    store_name VARCHAR(150) NOT NULL,
+    description TEXT NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    moderator_id INT NULL,
+    reviewed_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_merchant_applications_applicant FOREIGN KEY (applicant_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_merchant_applications_moderator FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_merchant_applications_queue (status, created_at),
+    INDEX idx_merchant_applications_applicant (applicant_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS merchant_stores (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    store_id INT NOT NULL,
+    application_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_merchant_stores_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_merchant_stores_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+    CONSTRAINT fk_merchant_stores_application FOREIGN KEY (application_id) REFERENCES merchant_applications(id) ON DELETE CASCADE,
+    CONSTRAINT uq_merchant_store_user UNIQUE (user_id, store_id),
+    CONSTRAINT uq_merchant_store_application UNIQUE (application_id),
+    INDEX idx_merchant_stores_store (store_id)
+);
+
+CREATE TABLE IF NOT EXISTS merchant_product_skus (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL,
+    sku VARCHAR(100) NOT NULL,
+    product_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_merchant_product_skus_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+    CONSTRAINT fk_merchant_product_skus_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT uq_merchant_store_sku UNIQUE (store_id, sku),
+    INDEX idx_merchant_product_skus_product (product_id)
 );
 
 CREATE TABLE IF NOT EXISTS product_trend_events (

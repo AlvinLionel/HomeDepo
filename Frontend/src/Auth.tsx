@@ -47,6 +47,7 @@ function Auth() {
 
             setSuccess("Login successful");
             localStorage.setItem("homexUsername", data.user.username);
+            localStorage.setItem("homexEmail", data.user.email);
             localStorage.setItem("homexUserId", String(data.user.id));
             localStorage.setItem("homexAccountType", data.user.accountType || "buyer");
             localStorage.setItem("homexIsModerator", String(Boolean(data.user.isModerator)));
@@ -92,6 +93,7 @@ function Auth() {
 
             setSuccess("Account created successfully");
             localStorage.setItem("homexUsername", data.user.username);
+            localStorage.setItem("homexEmail", data.user.email);
             localStorage.setItem("homexUserId", String(data.user.id));
             localStorage.setItem("homexAccountType", data.user.accountType || "buyer");
             localStorage.setItem("homexIsModerator", String(Boolean(data.user.isModerator)));

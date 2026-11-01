@@ -201,6 +201,105 @@ async function revokeUserSession(tokenHash) {
   await pool.query("DELETE FROM user_sessions WHERE token_hash = ?", [tokenHash]);
 }
 
+async function getAccountSettings(userId) {
+  const [rows] = await pool.query(
+    `SELECT users.username, users.email, user_settings.preferred_area,
+            COALESCE(user_settings.show_contact_phone, FALSE) AS show_contact_phone
+     FROM users
+     LEFT JOIN user_settings ON user_settings.user_id = users.id
+     WHERE users.id = ?
+     LIMIT 1`,
+    [userId]
+  );
+  if (!rows[0]) return null;
+
+  return {
+    username: rows[0].username,
+    email: rows[0].email,
+    preferredArea: rows[0].preferred_area || "",
+    showContactPhone: Boolean(rows[0].show_contact_phone),
+  };
+}
+
+async function updateAccountSettings(userId, settings) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    await connection.query(
+      "UPDATE users SET username = ? WHERE id = ?",
+      [settings.username, userId]
+    );
+    await connection.query(
+      `INSERT INTO user_settings (user_id, preferred_area, show_contact_phone)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         preferred_area = VALUES(preferred_area),
+         show_contact_phone = VALUES(show_contact_phone)`,
+      [userId, settings.preferredArea || null, settings.showContactPhone]
+    );
+    const [rows] = await connection.query(
+      `SELECT users.username, users.email, user_settings.preferred_area,
+              user_settings.show_contact_phone
+       FROM users
+       JOIN user_settings ON user_settings.user_id = users.id
+       WHERE users.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+    await connection.commit();
+    transactionStarted = false;
+    return {
+      username: rows[0].username,
+      email: rows[0].email,
+      preferredArea: rows[0].preferred_area || "",
+      showContactPhone: Boolean(rows[0].show_contact_phone),
+    };
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function changeAccountPassword(userId, currentTokenHash, currentPassword, newPassword) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [rows] = await connection.query(
+      "SELECT password_hash FROM users WHERE id = ? LIMIT 1 FOR UPDATE",
+      [userId]
+    );
+    if (!rows[0] || !(await verifyPassword(currentPassword, rows[0].password_hash))) {
+      await connection.rollback();
+      transactionStarted = false;
+      return false;
+    }
+
+    await connection.query(
+      "UPDATE users SET password_hash = ? WHERE id = ?",
+      [await hashPassword(newPassword), userId]
+    );
+    await connection.query(
+      "DELETE FROM user_sessions WHERE user_id = ? AND token_hash <> ?",
+      [userId, currentTokenHash]
+    );
+    await connection.query("DELETE FROM reset_tokens WHERE user_id = ?", [userId]);
+    await connection.commit();
+    transactionStarted = false;
+    return true;
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function upgradeUserToSeller(userId) {
   const [result] = await pool.query(
     "UPDATE users SET account_type = 'seller' WHERE id = ? AND account_type = 'buyer'",
@@ -229,10 +328,13 @@ async function getMarketplaceListings({ query, category, location, limit }) {
   const [rows] = await pool.query(
     `SELECT listings.id, listings.seller_id, listings.title, listings.description,
             listings.category_slug, listings.price, listings.condition_grade,
-            listings.neighborhood, listings.image_url, listings.contact_phone,
+            listings.neighborhood, listings.image_url,
+            CASE WHEN COALESCE(user_settings.show_contact_phone, FALSE) = TRUE
+              THEN listings.contact_phone ELSE NULL END AS contact_phone,
             listings.created_at, users.username AS seller_name
      FROM marketplace_listings AS listings
      JOIN users ON users.id = listings.seller_id
+     LEFT JOIN user_settings ON user_settings.user_id = users.id
      WHERE ${conditions.join(" AND ")}
      ORDER BY listings.created_at DESC
      LIMIT ?`,
@@ -313,23 +415,420 @@ async function updateMarketplaceListingStatus(listingId, sellerId, status) {
   return result.affectedRows > 0;
 }
 
+async function createMarketplaceListingReport(reporterId, { listingId, reason, details }) {
+  const [result] = await pool.query(
+    `INSERT INTO marketplace_listing_reports (listing_id, reporter_id, reason, details)
+     SELECT listings.id, ?, ?, ?
+     FROM marketplace_listings AS listings
+     WHERE listings.id = ? AND listings.seller_id <> ? AND listings.status = 'active'`,
+    [reporterId, reason, details, listingId, reporterId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function getPendingMarketplaceListingReports(limit = 100) {
+  const [rows] = await pool.query(
+    `SELECT reports.id, reports.listing_id, reports.reporter_id, reports.reason,
+            reports.details, reports.created_at, listings.title, listings.description,
+            listings.neighborhood, listings.status AS listing_status,
+            reporter.username AS reporter_name, seller.username AS seller_name,
+            seller.email AS seller_email
+     FROM marketplace_listing_reports AS reports
+     JOIN marketplace_listings AS listings ON listings.id = reports.listing_id
+     JOIN users AS reporter ON reporter.id = reports.reporter_id
+     JOIN users AS seller ON seller.id = listings.seller_id
+     WHERE reports.status = 'pending'
+     ORDER BY reports.created_at ASC, reports.id ASC
+     LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((report) => ({
+    id: report.id,
+    listingId: report.listing_id,
+    reporterId: report.reporter_id,
+    reason: report.reason,
+    details: report.details,
+    createdAt: report.created_at,
+    title: report.title,
+    description: report.description,
+    neighborhood: report.neighborhood,
+    listingStatus: report.listing_status,
+    reporterName: report.reporter_name,
+    sellerName: report.seller_name,
+    sellerEmail: report.seller_email,
+  }));
+}
+
+async function reviewMarketplaceListingReport(reportId, moderatorId, action) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [reports] = await connection.query(
+      `SELECT listing_id, status
+       FROM marketplace_listing_reports
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [reportId]
+    );
+
+    if (!reports[0]) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "not_found";
+    }
+    if (reports[0].status !== "pending") {
+      await connection.rollback();
+      transactionStarted = false;
+      return "already_reviewed";
+    }
+
+    if (action === "dismiss") {
+      await connection.query(
+        `UPDATE marketplace_listing_reports
+         SET status = 'dismissed', moderator_id = ?, reviewed_at = UTC_TIMESTAMP()
+         WHERE id = ? AND status = 'pending'`,
+        [moderatorId, reportId]
+      );
+    } else {
+      await connection.query(
+        `UPDATE marketplace_listings
+         SET status = 'removed'
+         WHERE id = ? AND status IN ('active', 'sold')`,
+        [reports[0].listing_id]
+      );
+      await connection.query(
+        `UPDATE marketplace_listing_reports
+         SET status = 'listing_removed', moderator_id = ?, reviewed_at = UTC_TIMESTAMP()
+         WHERE listing_id = ? AND status = 'pending'`,
+        [moderatorId, reports[0].listing_id]
+      );
+    }
+
+    await connection.commit();
+    transactionStarted = false;
+    return action === "dismiss" ? "dismissed" : "listing_removed";
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function createMerchantApplication(userId, application) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    await connection.query("SELECT id FROM users WHERE id = ? FOR UPDATE", [userId]);
+    const [pending] = await connection.query(
+      "SELECT id FROM merchant_applications WHERE applicant_id = ? AND status = 'pending' LIMIT 1",
+      [userId]
+    );
+    if (pending.length) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "pending_exists";
+    }
+
+    const [managedStores] = await connection.query(
+      `SELECT merchant_stores.id
+       FROM merchant_stores
+       JOIN stores ON stores.id = merchant_stores.store_id
+       WHERE merchant_stores.user_id = ?
+         AND LOWER(TRIM(stores.name)) = LOWER(TRIM(?))
+         AND LOWER(TRIM(stores.address)) = LOWER(TRIM(?))
+       LIMIT 1`,
+      [userId, application.storeName, application.address]
+    );
+    if (managedStores.length) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "already_managed";
+    }
+
+    const [result] = await connection.query(
+      `INSERT INTO merchant_applications
+         (applicant_id, store_name, description, address, phone)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, application.storeName, application.description, application.address, application.phone]
+    );
+    await connection.commit();
+    transactionStarted = false;
+    return result.insertId;
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function getMerchantDashboard(userId) {
+  const [applications] = await pool.query(
+    `SELECT id, store_name, description, address, phone, status, created_at, reviewed_at
+     FROM merchant_applications
+     WHERE applicant_id = ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [userId]
+  );
+  const [stores] = await pool.query(
+    `SELECT stores.id, stores.name, stores.description, stores.address, stores.phone,
+            stores.email, stores.created_at
+     FROM merchant_stores
+     JOIN stores ON stores.id = merchant_stores.store_id
+     WHERE merchant_stores.user_id = ?
+     ORDER BY stores.name`,
+    [userId]
+  );
+
+  return { application: applications[0] || null, stores };
+}
+
+async function getPendingMerchantApplications(limit = 100) {
+  const [rows] = await pool.query(
+    `SELECT applications.id, applications.applicant_id, applications.store_name,
+            applications.description, applications.address, applications.phone,
+            applications.created_at, users.username AS applicant_name,
+            users.email AS applicant_email
+     FROM merchant_applications AS applications
+     JOIN users ON users.id = applications.applicant_id
+     WHERE applications.status = 'pending'
+     ORDER BY applications.created_at ASC, applications.id ASC
+     LIMIT ?`,
+    [limit]
+  );
+
+  return rows.map((application) => ({
+    id: application.id,
+    applicantId: application.applicant_id,
+    storeName: application.store_name,
+    description: application.description,
+    address: application.address,
+    phone: application.phone,
+    createdAt: application.created_at,
+    applicantName: application.applicant_name,
+    applicantEmail: application.applicant_email,
+  }));
+}
+
+async function reviewMerchantApplication(applicationId, moderatorId, action) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [applications] = await connection.query(
+      `SELECT applicant_id, store_name, description, address, phone, status
+       FROM merchant_applications
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [applicationId]
+    );
+    const application = applications[0];
+    if (!application) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "not_found";
+    }
+    if (application.status !== "pending") {
+      await connection.rollback();
+      transactionStarted = false;
+      return "already_reviewed";
+    }
+
+    if (action === "reject") {
+      await connection.query(
+        `UPDATE merchant_applications
+         SET status = 'rejected', moderator_id = ?, reviewed_at = UTC_TIMESTAMP()
+         WHERE id = ? AND status = 'pending'`,
+        [moderatorId, applicationId]
+      );
+      await connection.commit();
+      transactionStarted = false;
+      return "rejected";
+    }
+
+    const [[applicant]] = await connection.query(
+      "SELECT email FROM users WHERE id = ? LIMIT 1",
+      [application.applicant_id]
+    );
+    const [existingStores] = await connection.query(
+      `SELECT id
+       FROM stores
+       WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+         AND LOWER(TRIM(address)) = LOWER(TRIM(?))
+       ORDER BY id
+       LIMIT 1
+       FOR UPDATE`,
+      [application.store_name, application.address]
+    );
+    let storeId;
+    if (existingStores[0]) {
+      storeId = existingStores[0].id;
+      await connection.query(
+        "UPDATE stores SET is_active = TRUE WHERE id = ?",
+        [storeId]
+      );
+    } else {
+      const [storeResult] = await connection.query(
+        `INSERT INTO stores (name, description, address, phone, email, is_active)
+         VALUES (?, ?, ?, ?, ?, TRUE)`,
+        [
+          application.store_name,
+          application.description,
+          application.address,
+          application.phone,
+          applicant.email,
+        ]
+      );
+      storeId = storeResult.insertId;
+    }
+
+    const [existingAssociation] = await connection.query(
+      `SELECT id FROM merchant_stores
+       WHERE user_id = ? AND store_id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [application.applicant_id, storeId]
+    );
+    if (!existingAssociation.length) {
+      await connection.query(
+        `INSERT INTO merchant_stores (user_id, store_id, application_id)
+         VALUES (?, ?, ?)`,
+        [application.applicant_id, storeId, applicationId]
+      );
+    }
+    await connection.query(
+      `UPDATE merchant_applications
+       SET status = 'approved', moderator_id = ?, reviewed_at = UTC_TIMESTAMP()
+       WHERE id = ? AND status = 'pending'`,
+      [moderatorId, applicationId]
+    );
+    await connection.commit();
+    transactionStarted = false;
+    return "approved";
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function importMerchantInventory(userId, storeId, products) {
+  const connection = await pool.getConnection();
+  let transactionStarted = false;
+
+  try {
+    await connection.beginTransaction();
+    transactionStarted = true;
+    const [access] = await connection.query(
+      `SELECT id FROM merchant_stores
+       WHERE user_id = ? AND store_id = ?
+       LIMIT 1`,
+      [userId, storeId]
+    );
+    if (!access.length) {
+      await connection.rollback();
+      transactionStarted = false;
+      return "forbidden";
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    for (const product of products) {
+      const [mappings] = await connection.query(
+        `SELECT product_id FROM merchant_product_skus
+         WHERE store_id = ? AND sku = ?
+         LIMIT 1`,
+        [storeId, product.sku]
+      );
+      let productId = mappings[0]?.product_id;
+
+      if (productId) {
+        updated += 1;
+      } else {
+        const [matches] = await connection.query(
+          `SELECT id FROM products
+           WHERE department_slug = ?
+             AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+             AND LOWER(TRIM(COALESCE(brand, ''))) = LOWER(TRIM(?))
+           ORDER BY id
+           LIMIT 1`,
+          [product.departmentSlug, product.name, product.brand]
+        );
+        if (matches[0]) {
+          productId = matches[0].id;
+        } else {
+          const [productResult] = await connection.query(
+            `INSERT INTO products
+               (department_slug, name, description, brand, unit, image_url)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              product.departmentSlug,
+              product.name,
+              product.description || null,
+              product.brand || null,
+              product.unit,
+              product.imageUrl,
+            ]
+          );
+          productId = productResult.insertId;
+        }
+
+        await connection.query(
+          `INSERT INTO merchant_product_skus (store_id, sku, product_id)
+           VALUES (?, ?, ?)`,
+          [storeId, product.sku, productId]
+        );
+        inserted += 1;
+      }
+
+      await connection.query(
+        `INSERT INTO store_products
+           (store_id, product_id, price, stock_quantity, is_available)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           price = VALUES(price),
+           stock_quantity = VALUES(stock_quantity),
+           is_available = VALUES(is_available),
+           updated_at = CURRENT_TIMESTAMP`,
+        [storeId, productId, product.price, product.stockQuantity, product.stockQuantity > 0]
+      );
+    }
+
+    await connection.commit();
+    transactionStarted = false;
+    return { inserted, updated };
+  } catch (error) {
+    if (transactionStarted) await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function getProductsByDepartment(departmentSlug) {
   const [rows] = await pool.query(
     `
       SELECT
-        p.id, p.name, p.description, p.brand, p.unit, (
-                SELECT sp2.image_url
-                FROM store_products sp2
-                WHERE sp2.product_id = p.id AND sp2.is_available = TRUE AND sp2.stock_quantity > 0
-                ORDER BY sp2.price ASC, sp2.id ASC
-                LIMIT 1
-            ) AS image_url,
+        p.id, p.name, p.description, p.brand, p.unit, p.image_url,
              MIN(sp.price) AS starting_price, COUNT(DISTINCT sp.store_id) AS store_count
       FROM products p
       JOIN store_products sp ON p.id = sp.product_id
       WHERE p.department_slug = ? AND sp.is_available = TRUE AND sp.stock_quantity > 0
       GROUP BY
-        p.id, p.name, p.description, p.brand, p.unit
+        p.id, p.name, p.description, p.brand, p.unit, p.image_url
       ORDER BY p.name
     `,
     [departmentSlug]
@@ -361,7 +860,7 @@ async function recordProductTrend({ productId, eventType, area, visitorHash }) {
 async function getTrendingProducts({ area, limit = 12 }) {
   const [rows] = await pool.query(
     `SELECT products.id, products.name, products.description, products.brand,
-            MIN(store_products.image_url) AS image_url,
+            products.image_url,
             MIN(store_products.price) AS starting_price,
             COUNT(DISTINCT store_products.store_id) AS store_count,
             COUNT(DISTINCT trends.visitor_hash) AS shopper_count,
@@ -379,7 +878,7 @@ async function getTrendingProducts({ area, limit = 12 }) {
        AND store_products.is_available = TRUE
        AND store_products.stock_quantity > 0
        AND stores.is_active = TRUE
-     GROUP BY products.id, products.name, products.description, products.brand
+     GROUP BY products.id, products.name, products.description, products.brand, products.image_url
      HAVING COUNT(DISTINCT trends.visitor_hash) >= 2
      ORDER BY shopper_count DESC, searcher_count DESC, viewer_count DESC,
               products.name ASC
@@ -405,7 +904,7 @@ async function getProductById(productId) {
   const [rows] = await pool.query(
     `
       SELECT
-        p.id AS product_id, p.name, p.description, p.brand, p.unit, s.id AS store_id,sp.image_url, s.name AS store_name, s.address, s.phone, s.email, sp.price, sp.stock_quantity, sp.is_available
+        p.id AS product_id, p.name, p.description, p.brand, p.unit, p.image_url, s.id AS store_id, s.name AS store_name, s.address, s.phone, s.email, sp.price, sp.stock_quantity, sp.is_available
       FROM products p
       LEFT JOIN store_products sp ON p.id = sp.product_id
       LEFT JOIN stores s ON sp.store_id = s.id
@@ -445,7 +944,7 @@ async function getProductsByStore(storeId) {
   const [rows] = await pool.query(
     `
       SELECT
-        p.id,  p.name, p.description, p.brand, p.unit, sp.image_url, p.department_slug, sp.price, sp.stock_quantity, sp.is_available
+        p.id, p.name, p.description, p.brand, p.unit, p.image_url, p.department_slug, sp.price, sp.stock_quantity, sp.is_available
       FROM store_products sp
       JOIN products p ON sp.product_id = p.id
       WHERE sp.store_id = ? AND sp.is_available = TRUE
@@ -493,6 +992,9 @@ module.exports = {
   createUserSession,
   findUserBySession,
   revokeUserSession,
+  getAccountSettings,
+  updateAccountSettings,
+  changeAccountPassword,
   upgradeUserToSeller,
   getUserIdByEmail,
   resetPassword,
@@ -507,4 +1009,12 @@ module.exports = {
   getSellerListings,
   createMarketplaceListing,
   updateMarketplaceListingStatus,
+  createMarketplaceListingReport,
+  getPendingMarketplaceListingReports,
+  reviewMarketplaceListingReport,
+  createMerchantApplication,
+  getMerchantDashboard,
+  getPendingMerchantApplications,
+  reviewMerchantApplication,
+  importMerchantInventory,
 };

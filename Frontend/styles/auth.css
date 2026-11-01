@@ -350,14 +350,8 @@ body.auth-page-body #root {
     line-height: 1.4;
 }
 
-.auth-page footer {
-    position: static;
-    width: 100%;
+.auth-page .site-footer {
     margin-top: auto;
-    padding: 0.85rem 1rem;
-    background: rgba(109, 71, 53, 0.94);
-    color: #fffaf4;
-    font-size: 0.73rem;
 }
 
 @media (max-width: 520px) {
@@ -399,7 +393,7 @@ body.auth-page-body #root {
         min-height: 48px;
     }
 
-    .auth-page footer {
+    .auth-page .site-footer {
         margin-top: 0.5rem;
     }
 }
